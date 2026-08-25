@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ t('login_title') }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<div class="form-page">
+    <div class="form-card">
+        <h1>🔐 {{ t('login_title') }}</h1>
+        <p class="muted">{{ t('login_subtitle') }}</p>
+
+        <form method="POST" action="{{ url_for('login') }}" id="loginForm" novalidate style="margin-top: 20px;">
+            <div class="form-group">
+                <label for="email">{{ t('label_email') }}</label>
+                <input type="email" id="email" name="email" required
+                       value="{{ email if email else '' }}"
+                       placeholder="{{ t('placeholder_email') }}">
+            </div>
+            <div class="form-group">
+                <label for="password">{{ t('label_password') }}</label>
+                <div class="input-icon-wrap">
+                    <input type="password" id="password" name="password" required
+                           placeholder="{{ t('placeholder_login_password') }}">
+                    <button type="button" class="password-toggle-btn" data-target="password" title="Show password">👁️</button>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">🚀 {{ t('btn_login') }}</button>
+        </form>
+        <p class="form-footer">
+            {{ t('no_account_yet') }} <a href="{{ url_for('register') }}"><strong>{{ t('nav_register') }}</strong></a><br>
+            <a href="{{ url_for('admin_login') }}">{{ t('admin_login_link') }}</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

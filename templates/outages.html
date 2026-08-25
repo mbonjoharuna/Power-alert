@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ t('outages_title') }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📍 {{ t('outages_title') }}</h1>
+    <p class="muted">{{ t('outages_subtitle') }}</p>
+</div>
+
+<form method="GET" action="{{ url_for('outages') }}" class="search-bar" id="searchForm">
+    <input type="text" name="q" value="{{ search }}" placeholder="🔍 {{ t('search_placeholder') }}"
+           class="search-input" id="searchInput">
+    <select name="status" class="search-select">
+        <option value="">{{ t('all_statuses') }}</option>
+        <option value="PENDING" {% if status_filter == 'PENDING' %}selected{% endif %}>🟡 {{ t('status_pending') }}</option>
+        <option value="VERIFIED" {% if status_filter == 'VERIFIED' %}selected{% endif %}>🔴 {{ t('status_verified') }}</option>
+        <option value="RESTORED" {% if status_filter == 'RESTORED' %}selected{% endif %}>🟢 {{ t('status_restored') }}</option>
+        <option value="REJECTED" {% if status_filter == 'REJECTED' %}selected{% endif %}>⚪ {{ t('status_rejected') }}</option>
+    </select>
+    <button type="submit" class="btn btn-primary">🔍 {{ t('btn_search') }}</button>
+</form>
+
+<section class="map-section compact">
+    <div id="map" class="map-container map-small"></div>
+</section>
+
+<div class="outage-list" id="outageList">
+    {% if outages %}
+        {% for o in outages %}
+        <div class="outage-card" data-neighborhood="{{ o.neighborhood | lower }}"
+             data-status="{{ o.status }}">
+            <div class="outage-header">
+                <strong>{{ o.neighborhood | upper }}</strong>
+                <span class="status-badge status-{{ o.status | lower }}">
+                    {% if o.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
+                    {% elif o.status == 'PENDING' %}🟡 {{ t('status_pending') }}
+                    {% elif o.status == 'RESTORED' %}🟢 {{ t('status_restored') }}
+                    {% else %}{{ o.status }}{% endif %}
+                </span>
+            </div>
+            <p style="font-size: 0.95rem; margin-bottom: 6px;"><strong>{{ t('th_location') }}:</strong> {{ o.location }}</p>
+            {% if o.description %}<p class="muted" style="margin-bottom: 8px;">{{ o.description }}</p>{% endif %}
+            <p class="outage-meta">
+                <span>🕒 {{ t('reported_on') }}: {{ o.start_time }}</span>
+                {% if o.estimated_restore %}
+                    <span>· ⏳ {{ t('est_restoration') }}: {{ o.estimated_restore }}</span>
+                {% endif %}
+                <span>· 👥 {{ t('confirmations_count') }}: {{ o.conf_count }}</span>
+            </p>
+            {% if o.estimated_restore and o.status != 'RESTORED' %}
+            <p class="estimate-note">⚠️ {{ t('estimate_disclaimer') }}</p>
+            {% endif %}
+            <div style="margin-top: 10px;">
+                <a href="{{ url_for('outage_details', outage_id=o.id) }}" class="btn btn-sm btn-outline">{{ t('btn_view_details') }} →</a>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p class="muted">{{ t('no_outages_found') }}</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof initOutageMap === 'function') {
+            initOutageMap('map');
+        }
+    });
+</script>
+{% endblock %}

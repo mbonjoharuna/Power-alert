@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="{{ current_lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ t('app_name') }}{% endblock %}</title>
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Leaflet CSS for simple map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+</head>
+<body>
+    <header class="navbar">
+        <div class="container nav-inner">
+            <a href="{{ url_for('index') }}" class="logo">
+                <span class="logo-icon-wrap">
+                    <span class="logo-icon">⚡</span>
+                </span>
+                <span class="logo-text">{{ t('app_name') }}</span>
+            </a>
+            
+            <div class="nav-right">
+                <nav class="nav-links">
+                    <a href="{{ url_for('outages') }}">
+                        <span class="nav-icon">📍</span> {{ t('nav_outages') }}
+                    </a>
+                    <a href="{{ url_for('ai_page') }}">
+                        <span class="nav-icon">🤖</span> {{ t('nav_ai') }}
+                    </a>
+                    {% if session.get('user_id') %}
+                        <a href="{{ url_for('dashboard') }}">
+                            <span class="nav-icon">📊</span> {{ t('nav_dashboard') }}
+                        </a>
+                        <a href="{{ url_for('report') }}" class="nav-btn-highlight">
+                            <span class="nav-icon">⚠️</span> {{ t('nav_report') }}
+                        </a>
+                        <a href="{{ url_for('my_reports') }}">
+                            <span class="nav-icon">📁</span> {{ t('nav_my_reports') }}
+                        </a>
+                        <a href="{{ url_for('logout') }}" class="btn-nav btn-nav-logout">{{ t('nav_logout') }}</a>
+                    {% elif session.get('admin_id') %}
+                        <a href="{{ url_for('admin_dashboard') }}">
+                            <span class="nav-icon">🛡️</span> {{ t('nav_admin') }}
+                        </a>
+                        <a href="{{ url_for('admin_logout') }}" class="btn-nav btn-nav-logout">{{ t('nav_logout') }}</a>
+                    {% else %}
+                        <a href="{{ url_for('login') }}">{{ t('nav_login') }}</a>
+                        <a href="{{ url_for('register') }}" class="btn-nav">{{ t('nav_register') }}</a>
+                        <a href="{{ url_for('admin_login') }}" class="btn-nav-outline">{{ t('nav_admin') }}</a>
+                    {% endif %}
+                </nav>
+
+                <div class="lang-switcher" aria-label="Language Selector">
+                    <a href="{{ url_for('set_language', lang='fr') }}"
+                       class="lang-btn {% if current_lang == 'fr' %}active{% endif %}"
+                       title="Français">🇫🇷 FR</a>
+                    <span class="lang-sep">|</span>
+                    <a href="{{ url_for('set_language', lang='en') }}"
+                       class="lang-btn {% if current_lang == 'en' %}active{% endif %}"
+                       title="English">🇬🇧 EN</a>
+                </div>
+
+                <button class="menu-toggle" id="menuToggle" aria-label="Menu">☰</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="flash-container">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }}">
+                                <span class="alert-icon">
+                                    {% if category == 'success' %}✓
+                                    {% elif category == 'danger' %}✕
+                                    {% elif category == 'warning' %}⚠
+                                    {% else %}ℹ{% endif %}
+                                </span>
+                                <span class="alert-text">{{ message }}</span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-brand">
+                <span class="footer-logo">⚡ {{ t('app_name') }}</span>
+                <p>{{ t('tagline') }}</p>
+            </div>
+            <p class="footer-note">{{ t('footer_disclaimer') }}</p>
+        </div>
+    </footer>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

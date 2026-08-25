@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ t('my_reports_title') }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📁 {{ t('my_reports_title') }}</h1>
+    <p class="muted">{{ t('my_reports_subtitle') }}</p>
+</div>
+
+{% if reports %}
+<div class="outage-list">
+    {% for o in reports %}
+    <div class="outage-card">
+        <div class="outage-header">
+            <strong>{{ o.neighborhood | upper }}</strong>
+            <span class="status-badge status-{{ o.status | lower }}">
+                {% if o.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
+                {% elif o.status == 'PENDING' %}🟡 {{ t('status_pending') }}
+                {% elif o.status == 'RESTORED' %}🟢 {{ t('status_restored') }}
+                {% else %}{{ o.status }}{% endif %}
+            </span>
+        </div>
+        <p style="font-size: 0.95rem; margin-bottom: 6px;"><strong>{{ t('th_location') }}:</strong> {{ o.location }}</p>
+        {% if o.description %}<p class="muted" style="margin-bottom: 8px;">{{ o.description }}</p>{% endif %}
+        <p class="outage-meta">
+            <span>🕒 {{ t('started_at') }}: {{ o.start_time }}</span>
+            {% if o.estimated_restore %}<span>· ⏳ {{ t('est_restoration') }}: {{ o.estimated_restore }}</span>{% endif %}
+            <span>· 👥 {{ t('confirmations_count') }}: {{ o.conf_count }}</span>
+        </p>
+        <div style="margin-top: 10px;">
+            <a href="{{ url_for('outage_details', outage_id=o.id) }}" class="btn btn-sm btn-outline">{{ t('btn_view_details') }} →</a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div style="background: white; padding: 40px; border-radius: var(--radius-lg); text-align: center; border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
+    <div style="font-size: 2.5rem; margin-bottom: 12px;">📭</div>
+    <p class="muted" style="font-size: 1rem; margin-bottom: 16px;">{{ t('no_reports_yet') }}</p>
+    <a href="{{ url_for('report') }}" class="btn btn-primary">⚠️ {{ t('report_one_now') }}</a>
+</div>
+{% endif %}
+{% endblock %}

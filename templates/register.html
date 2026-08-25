@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}{{ t('register_title') }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<div class="form-page">
+    <div class="form-card">
+        <h1>✨ {{ t('register_title') }}</h1>
+        <p class="muted">{{ t('register_subtitle') }}</p>
+
+        <form method="POST" action="{{ url_for('register') }}" id="registerForm" novalidate style="margin-top: 20px;">
+            <div class="form-group">
+                <label for="full_name">{{ t('label_full_name') }}</label>
+                <input type="text" id="full_name" name="full_name" required
+                       value="{{ form_data.get('full_name', '') if form_data else '' }}"
+                       placeholder="{{ t('placeholder_full_name') }}" maxlength="150">
+            </div>
+            <div class="form-group">
+                <label for="email">{{ t('label_email') }}</label>
+                <input type="email" id="email" name="email" required
+                       value="{{ form_data.get('email', '') if form_data else '' }}"
+                       placeholder="{{ t('placeholder_email') }}" maxlength="150">
+            </div>
+            <div class="form-group">
+                <label for="phone">{{ t('label_phone') }}</label>
+                <input type="tel" id="phone" name="phone" required
+                       value="{{ form_data.get('phone', '') if form_data else '' }}"
+                       placeholder="{{ t('placeholder_phone') }}" maxlength="20">
+            </div>
+            <div class="form-group">
+                <label for="password">{{ t('label_password') }}</label>
+                <div class="input-icon-wrap">
+                    <input type="password" id="password" name="password" required
+                           placeholder="{{ t('placeholder_password') }}" minlength="6">
+                    <button type="button" class="password-toggle-btn" data-target="password" title="Show password">👁️</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="neighborhood">{{ t('label_neighborhood') }}</label>
+                <input type="text" id="neighborhood" name="neighborhood" required
+                       value="{{ form_data.get('neighborhood', '') if form_data else '' }}"
+                       placeholder="{{ t('placeholder_neighborhood') }}" list="neighborhoods" maxlength="100">
+                <datalist id="neighborhoods">
+                    <option value="Bonamoussadi">
+                    <option value="Deido">
+                    <option value="Akwa">
+                    <option value="Bonanjo">
+                    <option value="Bali">
+                    <option value="New Bell">
+                    <option value="Bassa">
+                    <option value="Logbaba">
+                    <option value="Makepe">
+                    <option value="Kotto">
+                    <option value="Ndokoti">
+                    <option value="Yassa">
+                    <option value="Bonapriso">
+                    <option value="Bonaberi">
+                    <option value="PK 8">
+                    <option value="PK 10">
+                    <option value="PK 12">
+                    <option value="PK 14">
+                    <option value="PK 17">
+                </datalist>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">🚀 {{ t('btn_register') }}</button>
+        </form>
+        <p class="form-footer">{{ t('already_have_account') }} <a href="{{ url_for('login') }}"><strong>{{ t('link_login') }}</strong></a></p>
+    </div>
+</div>
+{% endblock %}

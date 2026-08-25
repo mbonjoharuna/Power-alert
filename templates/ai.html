@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ t('ai_title') }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🤖 {{ t('ai_title') }}</h1>
+    <p class="muted">{{ t('ai_subtitle') }}</p>
+</div>
+
+<div class="ai-box">
+    <form method="POST" action="{{ url_for('ai_page') }}" id="aiForm">
+        <div class="form-group">
+            <label for="question">💬 {{ t('label_your_question') }}</label>
+            <textarea id="question" name="question" rows="3" required
+                      placeholder="{{ t('placeholder_question') }}">{{ question }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">⚡ {{ t('btn_ask') }}</button>
+    </form>
+
+    <div class="ai-suggestions">
+        <p class="muted" style="margin-bottom: 8px; font-weight: 600;">💡 {{ t('try_suggestions') }}</p>
+        <button type="button" class="chip" data-q="{{ t('chip_1') }}">📍 {{ t('chip_1') }}</button>
+        <button type="button" class="chip" data-q="{{ t('chip_2') }}">⚡ {{ t('chip_2') }}</button>
+        <button type="button" class="chip" data-q="{{ t('chip_3') }}">⏳ {{ t('chip_3') }}</button>
+        <button type="button" class="chip" data-q="{{ t('chip_4') }}">🛡️ {{ t('chip_4') }}</button>
+    </div>
+
+    {% if answer %}
+    <div class="ai-answer">
+        <h3>✨ {{ t('ai_answer_title') }}</h3>
+        <div class="ai-answer-body">{{ answer | replace('\n', '<br>') | safe }}</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.querySelectorAll('.chip').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.getElementById('question').value = btn.getAttribute('data-q').replace(/^[^\s]+\s/, '');
+            document.getElementById('question').focus();
+        });
+    });
+</script>
+{% endblock %}

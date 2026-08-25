@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ t('nav_home') }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-text">
+        <h1>{{ t('hero_title') }}</h1>
+        <p class="lead">
+            {{ t('hero_lead') }}
+        </p>
+        <p>
+            {{ t('hero_desc') }}
+        </p>
+        <div class="hero-actions">
+            {% if session.get('user_id') %}
+                <a href="{{ url_for('report') }}" class="btn btn-primary">⚡ {{ t('btn_report_outage') }}</a>
+                <a href="{{ url_for('outages') }}" class="btn btn-outline">📍 {{ t('btn_view_outages') }}</a>
+            {% else %}
+                <a href="{{ url_for('register') }}" class="btn btn-primary">🚀 {{ t('btn_get_started') }}</a>
+                <a href="{{ url_for('outages') }}" class="btn btn-outline">📍 {{ t('btn_view_outages') }}</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="hero-visual">
+        <div class="hero-card">
+            <div class="hero-live-badge">
+                <span class="pulse-dot"></span>
+                <span>{{ t('hero_badge') }}</span>
+            </div>
+            <p>{{ t('hero_badge_sub') }}</p>
+        </div>
+    </div>
+</section>
+
+<section class="features">
+    <h2>{{ t('how_it_works') }}</h2>
+    <div class="feature-grid">
+        <div class="feature-card">
+            <div class="feature-icon-wrap">📝</div>
+            <h3>{{ t('feature_report_title') }}</h3>
+            <p>{{ t('feature_report_desc') }}</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon-wrap">✅</div>
+            <h3>{{ t('feature_confirm_title') }}</h3>
+            <p>{{ t('feature_confirm_desc') }}</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon-wrap">🗺️</div>
+            <h3>{{ t('feature_map_title') }}</h3>
+            <p>{{ t('feature_map_desc') }}</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon-wrap">🤖</div>
+            <h3>{{ t('feature_ai_title') }}</h3>
+            <p>{{ t('feature_ai_desc') }}</p>
+        </div>
+    </div>
+</section>
+
+<section class="map-section">
+    <h2>{{ t('map_title') }}</h2>
+    <p class="muted">{{ t('map_legend') }}</p>
+    <div id="map" class="map-container"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof initOutageMap === 'function') {
+            initOutageMap('map');
+        }
+    });
+</script>
+{% endblock %}

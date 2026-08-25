@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ t('admin_login_title') }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<div class="form-page">
+    <div class="form-card">
+        <h1>🛡️ {{ t('admin_login_title') }}</h1>
+        <p class="muted">{{ t('admin_login_hint') | safe }}</p>
+
+        <form method="POST" action="{{ url_for('admin_login') }}" style="margin-top: 20px;">
+            <div class="form-group">
+                <label for="username">👤 {{ t('label_username') }}</label>
+                <input type="text" id="username" name="username" required placeholder="admin">
+            </div>
+            <div class="form-group">
+                <label for="password">🔑 {{ t('label_password') }}</label>
+                <div class="input-icon-wrap">
+                    <input type="password" id="password" name="password" required>
+                    <button type="button" class="password-toggle-btn" data-target="password" title="Show password">👁️</button>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">🚀 {{ t('btn_admin_login') }}</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}{{ t('admin_dashboard_title') }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🛡️ {{ t('admin_dashboard_title') }}</h1>
+    <p class="muted">👤 {{ t('logged_in_as') }} <strong>{{ session.get('admin_username') }}</strong></p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-number">{{ total_users }}</div>
+        <div class="stat-label">👥 {{ t('stat_total_users') }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ total_reports }}</div>
+        <div class="stat-label">📋 {{ t('stat_total_reports') }}</div>
+    </div>
+    <div class="stat-card highlight">
+        <div class="stat-number">{{ pending }}</div>
+        <div class="stat-label">🟡 {{ t('stat_pending') }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ verified }}</div>
+        <div class="stat-label">🔴 {{ t('stat_verified') }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ restored }}</div>
+        <div class="stat-label">🟢 {{ t('stat_restored') }}</div>
+    </div>
+</div>
+
+<section class="section">
+    <h2 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 16px;">📍 {{ t('outages_title') }}</h2>
+    <div class="table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>{{ t('th_admin_id') }}</th>
+                    <th>{{ t('th_admin_user') }}</th>
+                    <th>{{ t('th_admin_neighborhood') }}</th>
+                    <th>{{ t('th_admin_location') }}</th>
+                    <th>{{ t('th_admin_description') }}</th>
+                    <th>{{ t('th_admin_status') }}</th>
+                    <th>{{ t('th_admin_restore') }}</th>
+                    <th>{{ t('th_admin_actions') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in reports %}
+                <tr>
+                    <td><strong>#{{ r.id }}</strong></td>
+                    <td>{{ r.full_name }}</td>
+                    <td><strong>{{ r.neighborhood }}</strong></td>
+                    <td>{{ r.location }}</td>
+                    <td class="desc-cell">{{ r.description or '—' }}</td>
+                    <td>
+                        <span class="status-badge status-{{ r.status | lower }}">
+                            {% if r.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
+                            {% elif r.status == 'PENDING' %}🟡 {{ t('status_pending') }}
+                            {% elif r.status == 'RESTORED' %}🟢 {{ t('status_restored') }}
+                            {% elif r.status == 'REJECTED' %}⚪ {{ t('status_rejected') }}
+                            {% else %}{{ r.status }}{% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        {% if r.estimated_restore %}
+                            <span style="font-size: 0.85rem; font-weight: 600;">{{ r.estimated_restore }}</span>
+                        {% else %}
+                            <span class="muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="actions-cell">
+                        <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
+                            {% if r.status == 'PENDING' %}
+                            <form method="POST" action="{{ url_for('admin_approve', outage_id=r.id) }}" class="inline-form">
+                                <button type="submit" class="btn btn-sm btn-success">✓ {{ t('btn_approve') }}</button>
+                            </form>
+                            <form method="POST" action="{{ url_for('admin_reject', outage_id=r.id) }}" class="inline-form">
+                                <button type="submit" class="btn btn-sm btn-danger"
+                                        onclick="return confirm('{{ t('confirm_reject') }}');">✕ {{ t('btn_reject') }}</button>
+                            </form>
+                            {% endif %}
+                            {% if r.status in ['PENDING', 'VERIFIED'] %}
+                            <form method="POST" action="{{ url_for('admin_restore', outage_id=r.id) }}" class="inline-form">
+                                <button type="submit" class="btn btn-sm btn-secondary">⚡ {{ t('btn_mark_restored') }}</button>
+                            </form>
+                            {% endif %}
+                            <form method="POST" action="{{ url_for('admin_delete', outage_id=r.id) }}" class="inline-form">
+                                <button type="submit" class="btn btn-sm btn-outline" style="color: #ef4444; border-color: #fecaca;"
+                                        onclick="return confirm('{{ t('confirm_delete') }}');">🗑️</button>
+                            </form>
+                        </div>
+                        <form method="POST" action="{{ url_for('admin_update', outage_id=r.id) }}" class="inline-form estimate-form">
+                            <input type="datetime-local" name="estimated_restore" required class="input-sm">
+                            <button type="submit" class="btn btn-sm btn-outline">⏳ {{ t('btn_update_estimate') }}</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="8" class="muted" style="text-align: center; padding: 24px;">{{ t('no_reports_admin') }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

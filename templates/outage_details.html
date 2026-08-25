@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ t('outage_detail_title') }}{{ outage.id }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('outages') }}" class="back-link">← {{ t('back_to_outages') }}</a>
+    <h1>📍 {{ outage.neighborhood | upper }}</h1>
+</div>
+
+<div class="detail-card">
+    <div class="outage-header">
+        <span class="status-badge status-{{ outage.status | lower }}">
+            {% if outage.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
+            {% elif outage.status == 'PENDING' %}🟡 {{ t('status_pending') }}
+            {% elif outage.status == 'RESTORED' %}🟢 {{ t('status_restored') }}
+            {% else %}{{ outage.status }}{% endif %}
+        </span>
+    </div>
+
+    <table class="detail-table">
+        <tr><th>📌 {{ t('th_location') }}</th><td><strong>{{ outage.location }}</strong></td></tr>
+        <tr><th>📝 {{ t('th_description') }}</th><td>{{ outage.description or '—' }}</td></tr>
+        <tr><th>👤 {{ t('th_reported_by') }}</th><td>{{ outage.full_name }}</td></tr>
+        <tr><th>🕒 {{ t('th_time_off') }}</th><td>{{ outage.start_time }}</td></tr>
+        <tr>
+            <th>⏳ {{ t('th_est_restore') }}</th>
+            <td>
+                {% if outage.estimated_restore %}
+                    <strong>{{ outage.estimated_restore }}</strong>
+                    <br><span class="estimate-note">⚠️ {{ t('estimate_disclaimer') }}</span>
+                {% else %}
+                    <span class="muted">{{ t('no_estimate_available') }}</span>
+                {% endif %}
+            </td>
+        </tr>
+        <tr><th>🏷️ {{ t('th_status') }}</th><td>{{ outage.status }}</td></tr>
+        <tr><th>🔴 {{ t('th_conf_off') }}</th><td><strong>{{ outage.conf_off }}</strong></td></tr>
+        <tr><th>🟢 {{ t('th_conf_restored') }}</th><td><strong>{{ outage.conf_restored }}</strong></td></tr>
+        <tr><th>📅 {{ t('th_created') }}</th><td>{{ outage.created_at }}</td></tr>
+    </table>
+
+    {% if session.get('user_id') and outage.status in ['PENDING', 'VERIFIED'] %}
+        {% if not user_confirmed %}
+        <div class="confirm-box">
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 6px;">👥 {{ t('confirm_box_title') }}</h3>
+            <p class="muted">{{ t('confirm_box_subtitle') }}</p>
+            <form method="POST" action="{{ url_for('confirm_outage', outage_id=outage.id) }}"
+                  class="confirm-forms" onsubmit="return confirmAction(this);">
+                <button type="submit" name="confirmation" value="STILL_OFF"
+                        class="btn btn-danger">🔴 {{ t('btn_confirm_off') }}</button>
+                <button type="submit" name="confirmation" value="RESTORED"
+                        class="btn btn-success">🟢 {{ t('btn_confirm_restored') }}</button>
+            </form>
+        </div>
+        {% else %}
+        <p class="info-box">✓ {{ t('already_confirmed_msg') }}</p>
+        {% endif %}
+    {% elif not session.get('user_id') %}
+        <p class="muted" style="margin-top: 20px;">
+            <a href="{{ url_for('login') }}"><strong>{{ t('nav_login') }}</strong></a> {{ t('login_to_confirm') }}
+        </p>
+    {% endif %}
+</div>
+{% endblock %}
