@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}Signaler par SMS & WhatsApp (Sans Internet) — Douala Power Alert{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom: 28px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 52px; height: 52px; border-radius: var(--radius-md); background: rgba(56, 189, 248, 0.16); border: 1px solid rgba(56, 189, 248, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; box-shadow: 0 0 18px rgba(56, 189, 248, 0.25);">
+                💬
+            </div>
+            <div>
+                <h1 style="margin: 0; font-size: 2.1rem; font-weight: 800; letter-spacing: -0.03em;">Passerelle SMS & WhatsApp</h1>
+                <p class="muted" style="margin: 2px 0 0; font-size: 1.02rem;">Signalez les coupures et consultez l'état du réseau même sans connexion Internet mobile 3G/4G.</p>
+            </div>
+        </div>
+        <div>
+            <span class="status-badge" style="background: rgba(34, 197, 94, 0.18); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.45); font-size: 0.88rem; padding: 6px 14px;">
+                ● Service GSM & WhatsApp Actif
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Context Banner: Offline / Low Bandwidth in Douala -->
+<div style="margin-bottom: 32px; padding: 20px 24px; border-radius: var(--radius-lg); background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(56, 189, 248, 0.25); display: flex; align-items: flex-start; gap: 16px;">
+    <span style="font-size: 2rem; line-height: 1;">⚡</span>
+    <div style="font-size: 0.96rem; color: #cbd5e1; line-height: 1.6;">
+        <strong style="color: #38bdf8; display: block; margin-bottom: 4px; font-size: 1.05rem;">Pourquoi ce service est essentiel à Douala ?</strong>
+        Lors des coupures de courant majeures (Akwa, Deido, Bonamoussadi, Bonaberi...), les antennes cellulaires perdent fréquemment leurs liaisons à haut débit ou saturent. La passerelle SMS & WhatsApp permet à chaque citoyen de transmettre des alertes avec un simple SMS GSM standard (2G/3G) sans consommer de forfait internet.
+    </div>
+</div>
+
+<!-- Interactive 1-Tap SMS & WhatsApp Quick Composer -->
+<div class="stat-card" style="margin-bottom: 36px; border-top: 3px solid #38bdf8; padding: 28px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+        <div>
+            <h2 style="font-size: 1.35rem; font-weight: 800; color: #f8fafc; margin: 0; letter-spacing: -0.01em;">
+                ⚡ Composer un Signalement en 1-Clic
+            </h2>
+            <p class="muted" style="margin: 4px 0 0; font-size: 0.92rem;">Sélectionnez votre quartier et envoyez directement le SMS ou WhatsApp pré-rempli depuis votre téléphone.</p>
+        </div>
+        <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); padding: 5px 12px;">
+            Numéro d'Alerte : +237 670 00 00 00
+        </span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin-bottom: 22px;">
+        <div>
+            <label style="display: block; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">
+                Quartier *
+            </label>
+            <select id="quickNeighborhood" class="form-control" style="width: 100%; padding: 12px; border-radius: var(--radius-md); background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #f8fafc; font-size: 0.95rem;">
+                <option value="Akwa" selected>Akwa</option>
+                <option value="Deido">Deido</option>
+                <option value="Bonanjo">Bonanjo</option>
+                <option value="Bonaberi">Bonaberi</option>
+                <option value="Bonamoussadi">Bonamoussadi</option>
+                <option value="Bali">Bali</option>
+                <option value="New Bell">New Bell</option>
+                <option value="Bassa">Bassa</option>
+                <option value="Makepe">Makepe</option>
+                <option value="Kotto">Kotto</option>
+                <option value="Ndokoti">Ndokoti</option>
+                <option value="Bépanda">Bépanda</option>
+                <option value="Logbaba">Logbaba</option>
+                <option value="Yassa">Yassa</option>
+                <option value="Bonapriso">Bonapriso</option>
+                <option value="Village">Village</option>
+                <option value="Cité des Palmiers">Cité des Palmiers</option>
+            </select>
+        </div>
+
+        <div>
+            <label style="display: block; font-size: 0.82rem; font-weight: 700; text-transform: uppercase; color: #94a3b8; margin-bottom: 8px;">
+                Précision / Carrefour / Rue (Optionnel)
+            </label>
+            <input type="text" id="quickLocation" class="form-control" placeholder="ex: Carrefour Agip, Rue Joss, Vers l'église"
+                   style="width: 100%; padding: 12px; border-radius: var(--radius-md); background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.15); color: #f8fafc; font-size: 0.95rem;">
+        </div>
+    </div>
+
+    <!-- Preview Message Box -->
+    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); padding: 14px 18px; border-radius: var(--radius-md); margin-bottom: 22px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+        <div>
+            <span style="font-size: 0.78rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; display: block;">Aperçu du texte généré :</span>
+            <code id="previewText" style="color: #38bdf8; font-size: 1.05rem; font-weight: 700;">COUPURE Akwa</code>
+        </div>
+        <span class="muted" style="font-size: 0.82rem;">1 SMS (160 car.)</span>
+    </div>
+
+    <!-- Trigger Action Buttons -->
+    <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+        <a id="btnTriggerSms" href="sms:+237670000000?body=COUPURE%20Akwa" class="btn btn-primary" style="flex: 1; min-width: 200px; text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);">
+            <span>📱</span> Envoyer par SMS (Sans Internet)
+        </a>
+        <a id="btnTriggerWa" href="https://wa.me/237670000000?text=COUPURE%20Akwa" target="_blank" class="btn btn-success" style="flex: 1; min-width: 200px; text-align: center; background: #16a34a; border-color: #22c55e; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35);">
+            <span>💬</span> Envoyer sur WhatsApp
+        </a>
+    </div>
+</div>
+
+<!-- Syntax Cheat Sheet Section -->
+<div style="margin-bottom: 36px;">
+    <h2 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; margin-bottom: 18px; letter-spacing: -0.01em;">
+        📋 Commandes SMS & WhatsApp Supportées
+    </h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px;">
+        <!-- 1. COUPURE -->
+        <div class="stat-card" style="border-left: 4px solid #ef4444;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <code style="color: #f87171; font-weight: 800; font-size: 1.05rem;">COUPURE &lt;Quartier&gt; [Lieu]</code>
+                <span class="badge bg-danger">Signaler</span>
+            </div>
+            <p class="muted" style="font-size: 0.88rem; margin-bottom: 12px;">Enregistre un délestage. Si un incident actif existe déjà dans le même quartier, votre confirmation (+1) est automatiquement ajoutée.</p>
+            <div style="background: rgba(0,0,0,0.25); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 0.84rem; color: #cbd5e1;">
+                Exemple: <code>COUPURE Deido Rue Joss</code>
+            </div>
+        </div>
+
+        <!-- 2. ETAT -->
+        <div class="stat-card" style="border-left: 4px solid #38bdf8;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <code style="color: #38bdf8; font-weight: 800; font-size: 1.05rem;">ETAT [Quartier]</code>
+                <span class="badge bg-info text-dark">Consulter</span>
+            </div>
+            <p class="muted" style="font-size: 0.88rem; margin-bottom: 12px;">Vérifie en direct les coupures actives dans un quartier précis ou renvoie le bilan global des pannes majeures à Douala.</p>
+            <div style="background: rgba(0,0,0,0.25); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 0.84rem; color: #cbd5e1;">
+                Exemple: <code>ETAT Bonamoussadi</code>
+            </div>
+        </div>
+
+        <!-- 3. CONFIRMER -->
+        <div class="stat-card" style="border-left: 4px solid #f59e0b;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <code style="color: #fbbf24; font-weight: 800; font-size: 1.05rem;">CONFIRMER &lt;ID&gt;</code>
+                <span class="badge bg-warning text-dark">Confirmer</span>
+            </div>
+            <p class="muted" style="font-size: 0.88rem; margin-bottom: 12px;">Ajoute votre voix civique pour confirmer que l'électricité est toujours coupée pour une alerte donnée.</p>
+            <div style="background: rgba(0,0,0,0.25); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 0.84rem; color: #cbd5e1;">
+                Exemple: <code>CONFIRMER 4</code>
+            </div>
+        </div>
+
+        <!-- 4. RETABLI -->
+        <div class="stat-card" style="border-left: 4px solid #22c55e;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                <code style="color: #4ade80; font-weight: 800; font-size: 1.05rem;">RETABLI &lt;ID&gt;</code>
+                <span class="badge bg-success">Rétablissement</span>
+            </div>
+            <p class="muted" style="font-size: 0.88rem; margin-bottom: 12px;">Signale aux voisins et aux administrateurs que la tension est rétablie dans votre secteur.</p>
+            <div style="background: rgba(0,0,0,0.25); padding: 8px 12px; border-radius: var(--radius-sm); font-size: 0.84rem; color: #cbd5e1;">
+                Exemple: <code>RETABLI 4</code>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Emergency Utilities & Hospitals Phone Directory -->
+<div class="stat-card" style="background: rgba(15, 23, 42, 0.6); padding: 24px; border-radius: var(--radius-lg);">
+    <h3 style="font-size: 1.25rem; font-weight: 800; color: #f8fafc; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
+        <span>🚨</span> Numéros d'Urgence Utiles à Douala
+    </h3>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px;">
+        <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
+            <strong style="color: #38bdf8; display: block;">Eneo Cameroun Dépannage</strong>
+            <span class="muted" style="font-size: 0.85rem;">Signalement transformateurs & pannes</span>
+            <div style="margin-top: 6px;">
+                <a href="tel:8010" style="color: #fff; font-weight: 700; text-decoration: none;">📞 8010 (Gratuit)</a>
+            </div>
+        </div>
+        <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
+            <strong style="color: #ef4444; display: block;">Hôpital Laquintinie</strong>
+            <span class="muted" style="font-size: 0.85rem;">Grandes urgences & réanimation</span>
+            <div style="margin-top: 6px;">
+                <a href="tel:+237233421540" style="color: #fff; font-weight: 700; text-decoration: none;">📞 233 42 15 40</a>
+            </div>
+        </div>
+        <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
+            <strong style="color: #6366f1; display: block;">Camwater Douala</strong>
+            <span class="muted" style="font-size: 0.85rem;">Stations de pompage & fuites</span>
+            <div style="margin-top: 6px;">
+                <a href="tel:+237233420000" style="color: #fff; font-weight: 700; text-decoration: none;">📞 233 42 00 00</a>
+            </div>
+        </div>
+        <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: var(--radius-md);">
+            <strong style="color: #eab308; display: block;">Sapeurs-Pompiers</strong>
+            <span class="muted" style="font-size: 0.85rem;">Incendies & câbles électriques tombés</span>
+            <div style="margin-top: 6px;">
+                <a href="tel:118" style="color: #fff; font-weight: 700; text-decoration: none;">📞 118 (Urgence)</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var neighborhoodSel = document.getElementById('quickNeighborhood');
+    var locationInput = document.getElementById('quickLocation');
+    var previewEl = document.getElementById('previewText');
+    var smsBtn = document.getElementById('btnTriggerSms');
+    var waBtn = document.getElementById('btnTriggerWa');
+
+    var gatewayNumber = "+237670000000";
+    var cleanWaNumber = "237670000000";
+
+    function updateComposer() {
+        var zone = neighborhoodSel.value.trim();
+        var loc = locationInput.value.trim();
+        var msg = "COUPURE " + zone + (loc ? (" " + loc) : "");
+
+        previewEl.textContent = msg;
+
+        // Encode for URI
+        var encMsg = encodeURIComponent(msg);
+        smsBtn.href = "sms:" + gatewayNumber + "?body=" + encMsg;
+        waBtn.href = "https://wa.me/" + cleanWaNumber + "?text=" + encMsg;
+    }
+
+    neighborhoodSel.addEventListener('change', updateComposer);
+    locationInput.addEventListener('input', updateComposer);
+    updateComposer();
+});
+</script>
+{% endblock %}

@@ -18,6 +18,7 @@ from services.facility_service import (
     get_all_facilities,
     get_critical_facilities_kpis
 )
+from services.gateway_service import handle_inbound_message
 
 api_bp = Blueprint("api", __name__)
 
@@ -265,3 +266,73 @@ def api_mark_notifications_read():
     success = mark_as_read(user_id, notif_id)
     unread_count = get_unread_count(user_id)
     return jsonify({"success": success, "unread_count": unread_count})
+
+
+# -------------------------------------------------------------
+# Option 2: SMS & WhatsApp Inbound Gateway Webhooks
+# -------------------------------------------------------------
+
+def _format_twiml_response(reply_text: str):
+    """Generate Twilio-compatible XML TwiML message response."""
+    from xml.sax.saxutils import escape
+    safe_text = escape(reply_text)
+    xml_content = f'<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n    <Message>{safe_text}</Message>\n</Response>'
+    return xml_content, 200, {"Content-Type": "application/xml; charset=utf-8"}
+
+
+def _handle_gateway_request(channel: str):
+    """Common parser for SMS and WhatsApp webhook payloads."""
+    # Check JSON body
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        sender = data.get("phone") or data.get("sender") or data.get("From") or ""
+        body = data.get("message") or data.get("text") or data.get("body") or data.get("Body") or ""
+        is_twilio = False
+    else:
+        # Check Form/Query (Twilio standard: From, Body)
+        sender = (
+            request.form.get("From")
+            or request.form.get("from")
+            or request.form.get("phone")
+            or request.form.get("sender")
+            or request.args.get("phone")
+            or ""
+        )
+        body = (
+            request.form.get("Body")
+            or request.form.get("body")
+            or request.form.get("message")
+            or request.form.get("text")
+            or request.args.get("message")
+            or ""
+        )
+        is_twilio = bool(request.form.get("From") or request.form.get("Body"))
+
+    # Execute incident processing
+    result = handle_inbound_message(sender_phone=sender, raw_text=body, channel=channel)
+
+    # Return Twilio TwiML if request originated from Twilio or format requested as xml
+    wants_xml = (
+        is_twilio
+        or request.args.get("format") == "xml"
+        or "application/xml" in request.headers.get("Accept", "")
+    )
+    if wants_xml:
+        return _format_twiml_response(result["response"])
+
+    return jsonify(result), (200 if result["status"] == "SUCCESS" else 400)
+
+
+@api_bp.route("/api/gateway/sms", methods=["POST"])
+@csrf.exempt
+def api_gateway_sms():
+    """Inbound webhook for SMS messages (Twilio, Gammu, Africa's Talking, GSM modem)."""
+    return _handle_gateway_request(channel="SMS")
+
+
+@api_bp.route("/api/gateway/whatsapp", methods=["POST"])
+@csrf.exempt
+def api_gateway_whatsapp():
+    """Inbound webhook for WhatsApp Business API / Twilio WhatsApp messages."""
+    return _handle_gateway_request(channel="WHATSAPP")
+

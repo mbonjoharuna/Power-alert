@@ -65,6 +65,9 @@
                         <a href="{{ url_for('admin_dashboard') }}">
                             <span class="nav-icon">🛡️</span> {{ t('nav_admin') }}
                         </a>
+                        <a href="{{ url_for('admin.admin_gateway') }}">
+                            <span class="nav-icon">💬</span> Passerelle SMS/WA
+                        </a>
                         <a href="{{ url_for('admin_logout') }}" class="btn-nav btn-nav-logout">{{ t('nav_logout') }}</a>
                     {% else %}
                         <a href="{{ url_for('login') }}">{{ t('nav_login') }}</a>
@@ -164,6 +167,10 @@
             <div style="margin-bottom: 12px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
                 <a href="{{ url_for('infrastructure') }}" style="color: #38bdf8; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
                     🏥 Surveillance Hôpitaux & Eau Camwater
+                </a>
+                <span style="color: rgba(255,255,255,0.2);">•</span>
+                <a href="{{ url_for('sms_guide') }}" style="color: #38bdf8; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                    💬 Passerelle SMS & WhatsApp (Sans Internet)
                 </a>
                 <span style="color: rgba(255,255,255,0.2);">•</span>
                 <a href="{{ url_for('offline') }}" style="color: #38bdf8; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">

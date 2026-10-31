@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}Passerelle SMS & WhatsApp — Admin{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Top Nav & Breadcrumb -->
+    <div class="mb-4">
+        <a href="{{ url_for('admin.admin_dashboard') }}" class="text-muted text-decoration-none small">
+            &larr; Tableau de bord Administrateur
+        </a>
+        <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 gap-3">
+            <div>
+                <h1 class="h2 fw-bold text-white mb-1 d-flex align-items-center gap-2">
+                    <span>💬</span> Passerelle SMS & WhatsApp
+                </h1>
+                <p class="text-muted mb-0">Surveillance des messages entrants, auto-réponses et simulateur d'incidents hors-ligne pour Douala.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('outages.sms_guide') }}" target="_blank" class="btn btn-outline-info btn-sm">
+                    <span>📖</span> Guide Citoyen SMS &rarr;
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Telemetry Stats -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-2-4" style="flex: 1; min-width: 140px;">
+            <div class="card bg-dark-glass border-glass p-3">
+                <span class="text-muted small text-uppercase">Total Reçus</span>
+                <span class="fs-3 fw-bold text-white mt-1">{{ kpis.total_messages }}</span>
+            </div>
+        </div>
+        <div class="col-6 col-md-2-4" style="flex: 1; min-width: 140px;">
+            <div class="card bg-dark-glass border-glass p-3">
+                <span class="text-muted small text-uppercase">SMS Classiques</span>
+                <span class="fs-3 fw-bold text-info mt-1">{{ kpis.sms_count }}</span>
+            </div>
+        </div>
+        <div class="col-6 col-md-2-4" style="flex: 1; min-width: 140px;">
+            <div class="card bg-dark-glass border-glass p-3">
+                <span class="text-muted small text-uppercase">WhatsApp API</span>
+                <span class="fs-3 fw-bold text-success mt-1">{{ kpis.whatsapp_count }}</span>
+            </div>
+        </div>
+        <div class="col-6 col-md-2-4" style="flex: 1; min-width: 140px;">
+            <div class="card bg-dark-glass border-glass p-3">
+                <span class="text-muted small text-uppercase">Coupures Liées</span>
+                <span class="fs-3 fw-bold text-warning mt-1">{{ kpis.outages_created }}</span>
+            </div>
+        </div>
+        <div class="col-6 col-md-2-4" style="flex: 1; min-width: 140px;">
+            <div class="card bg-dark-glass border-glass p-3">
+                <span class="text-muted small text-uppercase">Taux Succès</span>
+                <span class="fs-3 fw-bold text-primary mt-1">{{ kpis.success_rate }}%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simulator & Live Testing Console -->
+    <div class="card bg-dark-glass border-glass p-4 mb-4" style="border-left: 4px solid #38bdf8;">
+        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <div>
+                <h4 class="h5 fw-bold text-white mb-1 d-flex align-items-center gap-2">
+                    <span>🧪</span> Simulateur Interactif de Passerelle SMS / WhatsApp
+                </h4>
+                <p class="text-muted small mb-0">Testez le moteur d'analyse, l'affectation automatique de quartier, la détection des doublons et la formulation des réponses.</p>
+            </div>
+            <span class="badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4);">
+                Mode Test / Émulation Modems GSM
+            </span>
+        </div>
+
+        <form method="POST" action="{{ url_for('admin.admin_gateway_simulate') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Canal</label>
+                    <select name="channel" class="form-select bg-dark text-white border-glass" required>
+                        <option value="SMS" selected>📱 SMS Standard</option>
+                        <option value="WHATSAPP">💬 WhatsApp Business</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Numéro Expéditeur (+237)</label>
+                    <input type="text" name="phone" id="simPhone" class="form-control bg-dark text-white border-glass"
+                           value="+237 670 12 34 56" placeholder="+237 6XX XX XX XX" required>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Exemples Rapides (Cliquez)</label>
+                    <div class="d-flex flex-wrap gap-1">
+                        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="fillSim('COUPURE Akwa Boulevard de la Liberte')">
+                            COUPURE Akwa
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="fillSim('COUPURE Deido Rue Joss')">
+                            COUPURE Deido
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="fillSim('ETAT Deido')">
+                            ETAT Deido
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="fillSim('CONFIRMER 1')">
+                            CONFIRMER 1
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="fillSim('AIDE')">
+                            AIDE
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary" onclick="fillSim('Plus de courant a Bonamoussadi vers le rond-point')">
+                            Langage Naturel
+                        </button>
+                    </div>
+                </div>
+                <div class="col-12">
+                    <label class="form-label text-muted small text-uppercase fw-bold">Contenu du Message Reçu</label>
+                    <div class="input-group">
+                        <textarea name="message" id="simMessage" class="form-control bg-dark text-white border-glass"
+                                  rows="2" placeholder="Tapez une commande ou un message citoyen..." required>COUPURE Akwa Boulevard de la Liberte</textarea>
+                        <button type="submit" class="btn btn-primary px-4 fw-bold">
+                            🚀 Simuler l'Inbound
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Gateway Inbound Message Logs Table -->
+    <div class="card bg-dark-glass border-glass p-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+            <div>
+                <h4 class="h5 fw-bold text-white mb-0">📜 Journal des Messages Traités</h4>
+                <p class="text-muted small mb-0">Historique des requêtes citoyennes via SMS et WhatsApp</p>
+            </div>
+            <div class="btn-group btn-group-sm">
+                <a href="{{ url_for('admin.admin_gateway') }}"
+                   class="btn {% if not selected_channel %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    Tous
+                </a>
+                <a href="{{ url_for('admin.admin_gateway', channel='SMS') }}"
+                   class="btn {% if selected_channel == 'SMS' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    📱 SMS
+                </a>
+                <a href="{{ url_for('admin.admin_gateway', channel='WHATSAPP') }}"
+                   class="btn {% if selected_channel == 'WHATSAPP' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    💬 WhatsApp
+                </a>
+            </div>
+        </div>
+
+        {% if logs %}
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0" style="border-collapse: separate; border-spacing: 0 4px;">
+                <thead>
+                    <tr class="text-muted small text-uppercase">
+                        <th>ID</th>
+                        <th>Canal</th>
+                        <th>Expéditeur</th>
+                        <th>Message Brut</th>
+                        <th>Commande</th>
+                        <th>Quartier / Lieu</th>
+                        <th>Coupure Liée</th>
+                        <th>Réponse Automatique Envoyée</th>
+                        <th>Date & Heure</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td class="text-muted small">#{{ log.id }}</td>
+                        <td>
+                            {% if log.channel == 'WHATSAPP' %}
+                                <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4);">
+                                    💬 WhatsApp
+                                </span>
+                            {% else %}
+                                <span class="badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4);">
+                                    📱 SMS
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <code class="text-white small" style="background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;">
+                                {{ log.sender_phone }}
+                            </code>
+                        </td>
+                        <td style="max-width: 220px;">
+                            <span class="text-truncate d-block small" title="{{ log.raw_message }}">
+                                "{{ log.raw_message }}"
+                            </span>
+                        </td>
+                        <td>
+                            {% if log.parsed_command == 'COUPURE' %}
+                                <span class="badge bg-danger">COUPURE</span>
+                            {% elif log.parsed_command == 'STATUS' %}
+                                <span class="badge bg-info text-dark">ETAT</span>
+                            {% elif log.parsed_command == 'CONFIRM' %}
+                                <span class="badge bg-warning text-dark">CONFIRM</span>
+                            {% elif log.parsed_command == 'RESTORE' %}
+                                <span class="badge bg-success">RETABLI</span>
+                            {% elif log.parsed_command == 'HELP' %}
+                                <span class="badge bg-secondary">AIDE</span>
+                            {% else %}
+                                <span class="badge bg-dark border border-secondary text-muted">INCONNU</span>
+                            {% endif %}
+                        </td>
+                        <td class="small">
+                            {% if log.neighborhood %}
+                                <strong class="text-white">{{ log.neighborhood }}</strong>
+                                {% if log.location %}<br><span class="text-muted small">{{ log.location }}</span>{% endif %}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if log.outage_id %}
+                                <a href="{{ url_for('outages.outage_details', outage_id=log.outage_id) }}" target="_blank"
+                                   class="badge text-decoration-none" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4);">
+                                    Alerte #{{ log.outage_id }} &rarr;
+                                </a>
+                            {% else %}
+                                <span class="text-muted small">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="max-width: 280px;">
+                            <div class="small text-light text-truncate" title="{{ log.response_message }}" style="background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+                                {{ log.response_message }}
+                            </div>
+                        </td>
+                        <td class="text-muted small text-nowrap">
+                            {{ log.created_at.strftime('%d/%m %H:%M') if log.created_at else '' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <span style="font-size: 2.5rem; display: block; margin-bottom: 8px;">📭</span>
+            <p class="mb-0">Aucun message de passerelle enregistré pour le moment.</p>
+            <small>Utilisez le simulateur ci-dessus ou les endpoints de webhook pour envoyer un message de test.</small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function fillSim(msg) {
+    document.getElementById('simMessage').value = msg;
+}
+</script>
+{% endblock %}

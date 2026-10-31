@@ -34,6 +34,11 @@ from services.facility_service import (
     update_facility_power_status,
     sync_facilities_with_active_outages
 )
+from services.gateway_service import (
+    get_gateway_kpis,
+    get_gateway_logs,
+    handle_inbound_message
+)
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -491,3 +496,51 @@ def admin_delete_infrastructure(facility_id):
     else:
         flash("Erreur lors de la suppression.", "danger")
     return redirect(url_for("admin.admin_infrastructure"))
+
+
+# -------------------------------------------------------------
+# Option 2: SMS & WhatsApp Gateway Admin Oversight & Simulator
+# -------------------------------------------------------------
+
+@admin_bp.route("/admin/gateway")
+@admin_required
+def admin_gateway():
+    """Admin dashboard for inspecting SMS & WhatsApp gateway logs and simulating inbound messages."""
+    channel_filter = request.args.get("channel", "").strip().upper()
+    if channel_filter not in ("SMS", "WHATSAPP"):
+        channel_filter = None
+
+    kpis = get_gateway_kpis()
+    logs = get_gateway_logs(limit=100, channel=channel_filter)
+
+    return render_template(
+        "admin/admin_gateway.html",
+        kpis=kpis,
+        logs=logs,
+        selected_channel=channel_filter
+    )
+
+
+@admin_bp.route("/admin/gateway/simulate", methods=["POST"])
+@admin_required
+def admin_gateway_simulate():
+    """Interactive simulator allowing administrators to test SMS/WhatsApp commands and responses."""
+    channel = request.form.get("channel", "SMS").strip().upper()
+    phone = request.form.get("phone", "+237670000000").strip()
+    message = request.form.get("message", "AIDE").strip()
+
+    if not phone or not message:
+        flash("Numéro de téléphone et message requis pour simuler la passerelle.", "danger")
+        return redirect(url_for("admin.admin_gateway"))
+
+    result = handle_inbound_message(sender_phone=phone, raw_text=message, channel=channel)
+    cmd = result.get("command", "UNKNOWN")
+    reply = result.get("response", "")
+
+    if result.get("status") == "SUCCESS":
+        flash(f"✅ Simulation {channel} exécutée ({cmd}) ! Réponse : \"{reply}\"", "success")
+    else:
+        flash(f"⚠️ Simulation {channel} traitée avec avertissement : \"{reply}\"", "warning")
+
+    return redirect(url_for("admin.admin_gateway"))
+

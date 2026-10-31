@@ -34,6 +34,39 @@
     </button>
 </div>
 
+<!-- Offline SMS Emergency Reporting Card -->
+<div style="margin-bottom: 36px; padding: 22px 24px; border-radius: var(--radius-lg); background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.35); border-left: 5px solid #38bdf8;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 1.8rem;">💬</span>
+            <div>
+                <strong style="color: #f8fafc; font-size: 1.15rem; display: block;">Signaler une coupure par SMS (Sans Internet)</strong>
+                <span class="muted" style="font-size: 0.9rem;">Votre connexion cellulaire est coupée ? Envoyez un simple SMS pour alerter votre quartier.</span>
+            </div>
+        </div>
+        <a href="{{ url_for('outages.sms_guide') }}" class="btn btn-sm btn-outline" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
+            Guide Complet &rarr;
+        </a>
+    </div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="sms:+237670000000?body=COUPURE%20Deido" class="btn btn-sm btn-primary" style="flex: 1; min-width: 140px; text-align: center;">
+            📱 SMS : Deido
+        </a>
+        <a href="sms:+237670000000?body=COUPURE%20Akwa" class="btn btn-sm btn-primary" style="flex: 1; min-width: 140px; text-align: center;">
+            📱 SMS : Akwa
+        </a>
+        <a href="sms:+237670000000?body=COUPURE%20Bonamoussadi" class="btn btn-sm btn-primary" style="flex: 1; min-width: 140px; text-align: center;">
+            📱 SMS : Bonamoussadi
+        </a>
+        <a href="sms:+237670000000?body=COUPURE%20Bonaberi" class="btn btn-sm btn-primary" style="flex: 1; min-width: 140px; text-align: center;">
+            📱 SMS : Bonaberi
+        </a>
+        <a href="sms:+237670000000?body=AIDE" class="btn btn-sm btn-outline" style="min-width: 100px; text-align: center; border-color: rgba(255,255,255,0.2); color: #cbd5e1;">
+            ❓ AIDE
+        </a>
+    </div>
+</div>
+
 <!-- 1. Cached Outages Section -->
 <section class="section" style="margin-bottom: 40px;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">

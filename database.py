@@ -107,7 +107,7 @@ def init_db():
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     full_name VARCHAR(150) NOT NULL,
                     email VARCHAR(150) NOT NULL UNIQUE,
-                    phone VARCHAR(20) NOT NULL UNIQUE,
+                    phone VARCHAR(50) NOT NULL UNIQUE,
                     password_hash VARCHAR(255) NOT NULL,
                     neighborhood VARCHAR(100) NOT NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -138,6 +138,7 @@ def init_db():
                     outage_type ENUM('UNPLANNED', 'SCHEDULED') DEFAULT 'UNPLANNED',
                     schedule_id INT NULL,
                     affects_critical BOOLEAN DEFAULT FALSE,
+                    reported_via ENUM('WEB', 'SMS', 'WHATSAPP') DEFAULT 'WEB',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -209,11 +210,30 @@ def init_db():
                 ) ENGINE=InnoDB;
             """)
 
-            # Migration: ensure latitude, longitude, outage_type, schedule_id, and affects_critical columns exist in outages table
+            # Option 2: SMS & WhatsApp Gateway Log Table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS gateway_messages (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    channel ENUM('SMS', 'WHATSAPP') NOT NULL,
+                    sender_phone VARCHAR(50) NOT NULL,
+                    raw_message TEXT NOT NULL,
+                    parsed_command VARCHAR(50) NULL,
+                    neighborhood VARCHAR(100) NULL,
+                    location VARCHAR(255) NULL,
+                    outage_id INT NULL,
+                    response_message TEXT NULL,
+                    status ENUM('SUCCESS', 'FAILED', 'PENDING') DEFAULT 'SUCCESS',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_gw_phone (sender_phone, channel, created_at),
+                    FOREIGN KEY (outage_id) REFERENCES outages(id) ON DELETE SET NULL
+                ) ENGINE=InnoDB;
+            """)
+
+            # Migration: ensure latitude, longitude, outage_type, schedule_id, affects_critical, and reported_via exist in outages table
             cur.execute("""
                 SELECT COLUMN_NAME
                 FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'outages' AND COLUMN_NAME IN ('latitude', 'longitude', 'outage_type', 'schedule_id', 'affects_critical')
+                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'outages' AND COLUMN_NAME IN ('latitude', 'longitude', 'outage_type', 'schedule_id', 'affects_critical', 'reported_via')
             """, (os.getenv("DB_NAME", "douala_power_alert"),))
             existing_cols = [r["COLUMN_NAME"] if isinstance(r, dict) else r[0] for r in cur.fetchall()]
 
@@ -227,8 +247,11 @@ def init_db():
                 cur.execute("ALTER TABLE outages ADD COLUMN schedule_id INT NULL;")
             if "affects_critical" not in existing_cols:
                 cur.execute("ALTER TABLE outages ADD COLUMN affects_critical BOOLEAN DEFAULT FALSE;")
+            if "reported_via" not in existing_cols:
+                cur.execute("ALTER TABLE outages ADD COLUMN reported_via ENUM('WEB', 'SMS', 'WHATSAPP') DEFAULT 'WEB';")
         ensure_admin()
         ensure_default_critical_facilities()
+        ensure_default_gateway_user()
     except Exception as e:
         print(f"Database initialization warning: {e}")
 
@@ -259,5 +282,22 @@ def ensure_default_critical_facilities():
     try:
         from services.facility_service import seed_douala_critical_facilities
         seed_douala_critical_facilities(overwrite=False)
+    except Exception:
+        pass
+
+
+def ensure_default_gateway_user():
+    """Ensure default system user exists for anonymous or external SMS/WhatsApp reports."""
+    try:
+        with get_db_cursor(commit=True) as cur:
+            cur.execute("SELECT id FROM users WHERE phone = %s", ("+237000000000",))
+            row = cur.fetchone()
+            if not row:
+                cur.execute(
+                    """INSERT INTO users (full_name, email, phone, password_hash, neighborhood)
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    ("Passerelle SMS & WhatsApp", "gateway@power-alert.cm", "+237000000000",
+                     generate_password_hash("gatewaysecret123"), "Douala"),
+                )
     except Exception:
         pass

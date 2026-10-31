@@ -314,6 +314,13 @@ TRANSLATIONS = {
         'msg_facility_status_changed': 'Statut électrique de l’infrastructure mis à jour.',
         'outage_details_critical_title': '🚨 Établissements Critiques dans cette Zone',
         'outage_details_critical_desc': 'Cette coupure impacte des établissements de santé ou de distribution d’eau vitaux.',
+        'nav_sms_guide': 'Passerelle SMS & WA',
+        'nav_admin_gateway': 'Passerelle SMS/WA',
+        'sms_guide_title': 'Passerelle SMS & WhatsApp (Sans Internet)',
+        'sms_guide_subtitle': 'Signalez les coupures et consultez l\'état du réseau même sans connexion Internet mobile 3G/4G.',
+        'badge_reported_via_sms': '📱 SMS',
+        'badge_reported_via_wa': '💬 WhatsApp',
+        'badge_reported_via_web': '🌐 Web',
 },
     'en': {
         'app_name': 'Douala Power Alert',
@@ -630,6 +637,13 @@ TRANSLATIONS = {
         'msg_facility_status_changed': 'Facility power status updated.',
         'outage_details_critical_title': '🚨 Critical Facilities in this Area',
         'outage_details_critical_desc': 'This outage directly impacts critical healthcare or drinking water facilities.',
+        'nav_sms_guide': 'SMS & WA Gateway',
+        'nav_admin_gateway': 'SMS/WA Gateway',
+        'sms_guide_title': 'SMS & WhatsApp Gateway (Offline)',
+        'sms_guide_subtitle': 'Report blackouts and check grid status even without 3G/4G mobile internet connectivity.',
+        'badge_reported_via_sms': '📱 SMS',
+        'badge_reported_via_wa': '💬 WhatsApp',
+        'badge_reported_via_web': '🌐 Web',
 }
 }
 

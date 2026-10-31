@@ -273,7 +273,8 @@ def outages():
         return render_template("outages.html", outages=[], search=search, status_filter=status_filter, type_filter=type_filter, critical_filter=critical_filter)
 
 
-@outages_bp.route("/outage/<int:outage_id>")
+@outages_bp.route("/outage/<int:outage_id>", endpoint="outage_details")
+@outages_bp.route("/outage/<int:outage_id>", endpoint="outage_detail")
 def outage_details(outage_id):
     """Detailed view for a single outage including confirmations, GPS pinpoint, Eneo schedule correlation, and critical facilities."""
     lang = get_current_lang()
@@ -625,3 +626,10 @@ def analytics():
             neighborhood_stats=[],
             facilities_kpis={"total": 0, "on_grid": 0, "backup_generator": 0, "critical_blackout": 0}
         )
+
+
+@outages_bp.route("/sms-guide")
+def sms_guide():
+    """Citizen guide for reporting power outages and querying status via SMS & WhatsApp."""
+    return render_template("sms_guide.html")
+
