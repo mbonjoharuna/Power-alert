@@ -186,6 +186,12 @@ TRANSLATIONS = {
         'msg_auto_verified_community': 'Merci ! Avec {count} confirmations citoyennes, cette coupure a été automatiquement VÉRIFIÉE (Confirmée coupée) !',
         'msg_auto_restored_community': 'Merci ! Avec {count} confirmations de retour du courant, cette coupure a été automatiquement marquée comme RÉTABLIE !',
         'badge_community_verified': 'Vérifié par la communauté',
+        'label_pinpoint_map': 'Emplacement précis sur la carte (optionnel)',
+        'btn_use_my_location': '📍 Utiliser ma position',
+        'hint_pinpoint_map': 'Cliquez sur la carte ou déplacez le repère pour préciser l\'endroit exact de la coupure.',
+        'loc_detected_msg': 'Position GPS détectée avec succès !',
+        'msg_geo_denied': 'Accès à la géolocalisation refusé. Vous pouvez cliquer directement sur la carte.',
+        'msg_geo_unsupported': 'La géolocalisation n\'est pas supportée par votre navigateur.',
     },
     'en': {
         'app_name': 'Douala Power Alert',
@@ -374,6 +380,12 @@ TRANSLATIONS = {
         'msg_auto_verified_community': 'Thank you! With {count} community confirmations, this outage has been automatically VERIFIED!',
         'msg_auto_restored_community': 'Thank you! With {count} restoration confirmations, this outage has been automatically marked as RESTORED!',
         'badge_community_verified': 'Community Verified',
+        'label_pinpoint_map': 'Precise location on map (optional)',
+        'btn_use_my_location': '📍 Use my current location',
+        'hint_pinpoint_map': 'Click on the map or drag the pin to mark the exact outage location.',
+        'loc_detected_msg': 'GPS location detected successfully!',
+        'msg_geo_denied': 'Geolocation access denied. You can click directly on the map.',
+        'msg_geo_unsupported': 'Geolocation is not supported by your browser.',
     }
 }
 

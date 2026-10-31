@@ -133,6 +133,8 @@ def init_db():
                     start_time DATETIME NOT NULL,
                     estimated_restore DATETIME NULL,
                     status ENUM('PENDING', 'VERIFIED', 'RESTORED', 'REJECTED') DEFAULT 'PENDING',
+                    latitude DECIMAL(10, 7) NULL,
+                    longitude DECIMAL(10, 7) NULL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -151,6 +153,19 @@ def init_db():
                     UNIQUE KEY unique_user_outage (outage_id, user_id)
                 ) ENGINE=InnoDB;
             """)
+
+            # Migration: ensure latitude and longitude columns exist in outages table
+            cur.execute("""
+                SELECT COLUMN_NAME
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'outages' AND COLUMN_NAME IN ('latitude', 'longitude')
+            """, (os.getenv("DB_NAME", "douala_power_alert"),))
+            existing_cols = [r["COLUMN_NAME"] if isinstance(r, dict) else r[0] for r in cur.fetchall()]
+
+            if "latitude" not in existing_cols:
+                cur.execute("ALTER TABLE outages ADD COLUMN latitude DECIMAL(10, 7) NULL;")
+            if "longitude" not in existing_cols:
+                cur.execute("ALTER TABLE outages ADD COLUMN longitude DECIMAL(10, 7) NULL;")
         ensure_admin()
     except Exception as e:
         print(f"Database initialization warning: {e}")

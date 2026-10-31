@@ -37,6 +37,8 @@
 
         <form method="POST" action="{{ url_for('report') }}" id="reportForm" novalidate style="margin-top: 24px;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" id="latitude" name="latitude" value="{{ form_data.latitude if form_data else '' }}">
+            <input type="hidden" id="longitude" name="longitude" value="{{ form_data.longitude if form_data else '' }}">
 
             <div class="form-group">
                 <label for="neighborhood">📍 {{ t('label_neighborhood') }}</label>
@@ -80,6 +82,19 @@
                 <input type="text" id="location" name="location" required
                        value="{{ form_data.location if form_data else '' }}"
                        maxlength="200" placeholder="{{ t('placeholder_location') }}">
+            </div>
+
+            <!-- GPS & Interactive Pinpoint Mini-Map -->
+            <div class="form-group" style="margin-top: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
+                    <label for="reportMap" style="margin-bottom: 0; font-weight: 700;">🗺️ {{ t('label_pinpoint_map') }}</label>
+                    <button type="button" id="btnGeo" class="btn btn-sm btn-outline" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; padding: 4px 10px;">
+                        {{ t('btn_use_my_location') }}
+                    </button>
+                </div>
+                <p class="muted" style="font-size: 0.85rem; margin-bottom: 8px;">{{ t('hint_pinpoint_map') }}</p>
+                <div id="reportMap" style="height: 250px; width: 100%; border-radius: var(--radius-md); border: 1.5px solid var(--border); box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); z-index: 1;"></div>
+                <div id="geoStatus" style="font-size: 0.83rem; margin-top: 6px; display: none; font-weight: 600;"></div>
             </div>
 
             <div class="form-group">
@@ -150,28 +165,172 @@
                         }
                     }
                 })
-                .catch(function () {
-                    // Silently ignore network check failures
-                });
+                .catch(function () {});
         }
 
         if (neighborhoodInput) {
-            // Trigger check on load if a neighborhood is pre-filled
             if (neighborhoodInput.value) {
                 checkDuplicate(neighborhoodInput.value);
             }
-
             neighborhoodInput.addEventListener('input', function () {
                 clearTimeout(checkTimeout);
                 checkTimeout = setTimeout(function () {
                     checkDuplicate(neighborhoodInput.value);
                 }, 400);
             });
-
             neighborhoodInput.addEventListener('change', function () {
                 checkDuplicate(neighborhoodInput.value);
             });
         }
+
+        // 3. Interactive Leaflet Mini-Map for Precise Pinpoint Selection
+        var latInput = document.getElementById('latitude');
+        var lngInput = document.getElementById('longitude');
+        var btnGeo = document.getElementById('btnGeo');
+        var geoStatus = document.getElementById('geoStatus');
+
+        var neighborhoodCoords = {
+            "bonamoussadi": [4.0850, 9.7400],
+            "deido": [4.0600, 9.7200],
+            "akwa": [4.0500, 9.7000],
+            "bonanjo": [4.0400, 9.6900],
+            "bali": [4.0450, 9.7050],
+            "new bell": [4.0300, 9.7100],
+            "bassa": [4.0200, 9.7500],
+            "logbaba": [4.0100, 9.7600],
+            "makepe": [4.0900, 9.7300],
+            "kotto": [4.1000, 9.7500],
+            "ndokoti": [4.0550, 9.7450],
+            "yassa": [4.0000, 9.7800],
+            "bonapriso": [4.0350, 9.6950],
+            "bonaberi": [4.0800, 9.6700],
+            "pk 8": [4.0700, 9.7800],
+            "pk 10": [4.0650, 9.8000],
+            "pk 12": [4.0600, 9.8200],
+            "pk 14": [4.0550, 9.8400],
+            "pk 17": [4.0500, 9.8700]
+        };
+
+        var initialLat = 4.0511;
+        var initialLng = 9.7679;
+        var initialZoom = 13;
+        var hasCustomPin = false;
+
+        if (latInput.value && lngInput.value) {
+            initialLat = parseFloat(latInput.value);
+            initialLng = parseFloat(lngInput.value);
+            initialZoom = 15;
+            hasCustomPin = true;
+        } else if (neighborhoodInput && neighborhoodInput.value) {
+            var nKey = neighborhoodInput.value.toLowerCase().trim();
+            if (neighborhoodCoords[nKey]) {
+                initialLat = neighborhoodCoords[nKey][0];
+                initialLng = neighborhoodCoords[nKey][1];
+                initialZoom = 14;
+            }
+        }
+
+        var reportMap = L.map('reportMap').setView([initialLat, initialLng], initialZoom);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(reportMap);
+
+        var pinIcon = L.divIcon({
+            className: 'custom-marker-wrap',
+            html: '<div class="marker-pulse pulse-red"></div><div class="marker-core core-red" style="width: 18px; height: 18px; line-height: 18px; font-size: 10px;">📍</div>',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+        });
+
+        var pinMarker = null;
+
+        function setPin(lat, lng) {
+            latInput.value = lat.toFixed(6);
+            lngInput.value = lng.toFixed(6);
+            hasCustomPin = true;
+
+            if (!pinMarker) {
+                pinMarker = L.marker([lat, lng], { draggable: true, icon: pinIcon }).addTo(reportMap);
+                pinMarker.on('dragend', function (e) {
+                    var pos = e.target.getLatLng();
+                    latInput.value = pos.lat.toFixed(6);
+                    lngInput.value = pos.lng.toFixed(6);
+                });
+            } else {
+                pinMarker.setLatLng([lat, lng]);
+            }
+        }
+
+        if (hasCustomPin) {
+            setPin(initialLat, initialLng);
+        }
+
+        reportMap.on('click', function (e) {
+            setPin(e.latlng.lat, e.latlng.lng);
+            geoStatus.style.display = 'block';
+            geoStatus.style.color = '#2563eb';
+            geoStatus.textContent = '📍 Point placé : ' + e.latlng.lat.toFixed(4) + ', ' + e.latlng.lng.toFixed(4);
+        });
+
+        // HTML5 Geolocation Button
+        if (btnGeo) {
+            btnGeo.addEventListener('click', function () {
+                if (!navigator.geolocation) {
+                    geoStatus.style.display = 'block';
+                    geoStatus.style.color = '#ef4444';
+                    geoStatus.textContent = '⚠️ {{ t("msg_geo_unsupported") }}';
+                    return;
+                }
+
+                btnGeo.disabled = true;
+                btnGeo.textContent = '⏳ Recherche GPS...';
+
+                navigator.geolocation.getCurrentPosition(
+                    function (pos) {
+                        btnGeo.disabled = false;
+                        btnGeo.textContent = '{{ t("btn_use_my_location") }}';
+                        var lat = pos.coords.latitude;
+                        var lng = pos.coords.longitude;
+
+                        // Center map and set pin
+                        reportMap.setView([lat, lng], 16);
+                        setPin(lat, lng);
+
+                        geoStatus.style.display = 'block';
+                        geoStatus.style.color = '#10b981';
+                        geoStatus.textContent = '✓ {{ t("loc_detected_msg") }} (' + lat.toFixed(4) + ', ' + lng.toFixed(4) + ')';
+                    },
+                    function (err) {
+                        btnGeo.disabled = false;
+                        btnGeo.textContent = '{{ t("btn_use_my_location") }}';
+                        geoStatus.style.display = 'block';
+                        geoStatus.style.color = '#ef4444';
+                        geoStatus.textContent = '⚠️ {{ t("msg_geo_denied") }}';
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            });
+        }
+
+        // Neighborhood change pans map if user hasn't placed a custom pin yet
+        if (neighborhoodInput) {
+            neighborhoodInput.addEventListener('change', function () {
+                if (!hasCustomPin) {
+                    var nKey = neighborhoodInput.value.toLowerCase().trim();
+                    if (neighborhoodCoords[nKey]) {
+                        var target = neighborhoodCoords[nKey];
+                        reportMap.setView(target, 14);
+                    }
+                }
+            });
+        }
+
+        // Invalidate map size after DOM render to ensure Leaflet renders all tiles cleanly
+        setTimeout(function () {
+            reportMap.invalidateSize();
+        }, 200);
     });
 </script>
 {% endblock %}

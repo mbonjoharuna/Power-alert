@@ -39,6 +39,17 @@
             </td>
         </tr>
         <tr><th>🏷️ {{ t('th_status') }}</th><td>{{ outage.status }}</td></tr>
+        {% if outage.latitude and outage.longitude %}
+        <tr>
+            <th>📍 Coordonnées GPS</th>
+            <td>
+                <code>{{ outage.latitude }}, {{ outage.longitude }}</code>
+                <a href="https://www.google.com/maps?q={{ outage.latitude }},{{ outage.longitude }}" target="_blank" rel="noopener noreferrer" style="margin-left: 8px; font-size: 0.85rem;" class="btn btn-sm btn-outline">
+                    🗺️ Maps ↗
+                </a>
+            </td>
+        </tr>
+        {% endif %}
         <tr><th>🔴 {{ t('th_conf_off') }}</th><td><strong>{{ outage.conf_off }}</strong></td></tr>
         <tr><th>🟢 {{ t('th_conf_restored') }}</th><td><strong>{{ outage.conf_restored }}</strong></td></tr>
         <tr><th>📅 {{ t('th_created') }}</th><td>{{ outage.created_at }}</td></tr>

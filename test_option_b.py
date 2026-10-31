@@ -12,32 +12,36 @@ init_db()
 
 # Create 4 test users for confirmation tests
 user_ids = []
+run_id = int(time.time())
+test_n = f"Zone_{run_id}"
+
 with get_db_cursor(commit=True) as cur:
     for i in range(1, 5):
-        email = f"citizen_{i}_{int(time.time())}@douala.cm"
+        email = f"citizen_{i}_{run_id}@douala.cm"
         cur.execute("""
             INSERT INTO users (full_name, email, phone, password_hash, neighborhood)
             VALUES (%s, %s, %s, %s, %s)
-        """, (f"Citizen {i}", email, f"67{int(time.time())%1000000:06d}{i}", "hash", "Deido"))
+        """, (f"Citizen {i}", email, f"67{run_id%1000000:06d}{i}", "hash", test_n))
         user_ids.append(cur.lastrowid)
 
-print(f"Created 4 test users: {user_ids}")
+print(f"Created 4 test users: {user_ids} in {test_n}")
 
 with app.test_client() as client:
     # Set session to User 1
     with client.session_transaction() as sess:
         sess["user_id"] = user_ids[0]
         sess["user_name"] = "Citizen 1"
-        sess["user_neighborhood"] = "Deido"
+        sess["user_neighborhood"] = test_n
         sess["lang"] = "fr"
 
     # --- Test 1: Check active-by-neighborhood API before any report ---
-    res_api_empty = client.get("/api/outages/active-by-neighborhood?neighborhood=Deido")
+    res_api_empty = client.get(f"/api/outages/active-by-neighborhood?neighborhood={test_n}")
     assert res_api_empty.status_code == 200
     data_empty = res_api_empty.get_json()
-    print("API check before report:", data_empty)
+    assert data_empty["found"] is False
+    print("API check before report (empty):", data_empty)
 
-    # --- Test 2: Create initial report in Deido ---
+    # --- Test 2: Create initial report in test_n ---
     rep_get = client.get("/report")
     m_csrf = re.search(r'name="csrf_token"\s+value="([^"]+)"', rep_get.data.decode("utf-8"))
     assert m_csrf, "CSRF token not found"
@@ -45,30 +49,30 @@ with app.test_client() as client:
 
     res_initial = client.post("/report", data={
         "csrf_token": csrf_tok,
-        "neighborhood": "Deido",
+        "neighborhood": test_n,
         "location": "Rue de la Joie",
         "description": "Panne de transformateur",
         "start_time": "2026-10-31T13:00"
     }, follow_redirects=True)
     assert res_initial.status_code == 200
-    print("Initial outage in Deido reported successfully.")
+    print(f"Initial outage in {test_n} reported successfully.")
 
     # Find the outage id in DB
     with get_db_cursor() as cur:
-        cur.execute("SELECT id, status FROM outages WHERE neighborhood = 'Deido' AND location = 'Rue de la Joie' ORDER BY id DESC LIMIT 1")
+        cur.execute("SELECT id, status FROM outages WHERE neighborhood = %s AND location = 'Rue de la Joie' ORDER BY id DESC LIMIT 1", (test_n,))
         initial_outage = cur.fetchone()
         outage_id = initial_outage["id"]
         assert initial_outage["status"] == "PENDING"
     print(f"Initial Outage ID: {outage_id}, Status: {initial_outage['status']}")
 
     # --- Test 3: API returns active outage now ---
-    res_api_found = client.get("/api/outages/active-by-neighborhood?neighborhood=Deido")
+    res_api_found = client.get(f"/api/outages/active-by-neighborhood?neighborhood={test_n}")
     assert res_api_found.status_code == 200
     data_found = res_api_found.get_json()
     assert data_found["found"] is True
     assert len(data_found["outages"]) > 0
     assert data_found["outages"][0]["id"] == outage_id
-    print("API successfully detected active outage in Deido:", data_found["outages"][0]["location"])
+    print(f"API successfully detected active outage in {test_n}:", data_found["outages"][0]["location"])
 
     # --- Test 4: Duplicate Detection on POST /report (without is_distinct) ---
     rep_get2 = client.get("/report")
@@ -77,7 +81,7 @@ with app.test_client() as client:
 
     res_dup = client.post("/report", data={
         "csrf_token": csrf_tok2,
-        "neighborhood": "Deido",
+        "neighborhood": test_n,
         "location": "Carrefour des Fleurs",
         "description": "Plus de lumière",
         "start_time": "2026-10-31T13:10"
@@ -90,7 +94,7 @@ with app.test_client() as client:
     # --- Test 5: Reporting with is_distinct=1 allows separate report ---
     res_distinct = client.post("/report", data={
         "csrf_token": csrf_tok2,
-        "neighborhood": "Deido",
+        "neighborhood": test_n,
         "location": "Grand Moulin",
         "description": "Autre panne distincte",
         "start_time": "2026-10-31T13:15",

@@ -291,7 +291,9 @@ def report():
         "neighborhood": session.get("user_neighborhood", ""),
         "location": "",
         "description": "",
-        "start_time": ""
+        "start_time": "",
+        "latitude": "",
+        "longitude": "",
     }
 
     if request.method == "POST":
@@ -299,13 +301,30 @@ def report():
         location = request.form.get("location", "").strip()
         description = request.form.get("description", "").strip()
         start_time_str = request.form.get("start_time", "").strip()
+        latitude_str = request.form.get("latitude", "").strip()
+        longitude_str = request.form.get("longitude", "").strip()
         is_distinct = request.form.get("is_distinct", "") == "1"
+
+        lat = None
+        lng = None
+        if latitude_str and longitude_str:
+            try:
+                parsed_lat = float(latitude_str)
+                parsed_lng = float(longitude_str)
+                # Douala / Littoral bounding check (lat: 3.5 to 4.6, lng: 9.3 to 10.3)
+                if 3.5 <= parsed_lat <= 4.6 and 9.3 <= parsed_lng <= 10.3:
+                    lat = parsed_lat
+                    lng = parsed_lng
+            except ValueError:
+                lat, lng = None, None
 
         form_data = {
             "neighborhood": neighborhood,
             "location": location,
             "description": description,
-            "start_time": start_time_str
+            "start_time": start_time_str,
+            "latitude": str(lat) if lat is not None else "",
+            "longitude": str(lng) if lng is not None else "",
         }
 
         if not all([neighborhood, location, start_time_str]):
@@ -347,9 +366,9 @@ def report():
             with get_db_cursor(commit=True) as cur:
                 cur.execute(
                     """INSERT INTO outages
-                       (user_id, neighborhood, location, description, start_time, status)
-                       VALUES (%s, %s, %s, %s, %s, 'PENDING')""",
-                    (session["user_id"], neighborhood, location, description, start_time),
+                       (user_id, neighborhood, location, description, start_time, status, latitude, longitude)
+                       VALUES (%s, %s, %s, %s, %s, 'PENDING', %s, %s)""",
+                    (session["user_id"], neighborhood, location, description, start_time, lat, lng),
                 )
             flash(get_text("msg_report_success", lang=lang), "success")
             return redirect(url_for("outages"))
@@ -789,11 +808,11 @@ def api_map_outages():
     try:
         with get_db_cursor() as cur:
             cur.execute("""
-                SELECT id, neighborhood, location, status
+                SELECT id, neighborhood, location, status, latitude, longitude
                 FROM outages
                 WHERE status IN ('PENDING', 'VERIFIED', 'RESTORED')
                 ORDER BY created_at DESC
-                LIMIT 50
+                LIMIT 100
             """)
             rows = cur.fetchall()
 
@@ -822,14 +841,21 @@ def api_map_outages():
         markers = []
         for r in rows:
             key = r["neighborhood"].lower().strip()
-            latlng = coords.get(key, [4.0511, 9.7679])
+            if r.get("latitude") is not None and r.get("longitude") is not None:
+                lat = float(r["latitude"])
+                lng = float(r["longitude"])
+            else:
+                latlng = coords.get(key, [4.0511, 9.7679])
+                lat = latlng[0]
+                lng = latlng[1]
+
             markers.append({
                 "id": r["id"],
                 "neighborhood": r["neighborhood"],
                 "location": r["location"],
                 "status": r["status"],
-                "lat": latlng[0],
-                "lng": latlng[1],
+                "lat": lat,
+                "lng": lng,
             })
         return jsonify(markers)
     except Error:
