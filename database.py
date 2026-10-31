@@ -170,11 +170,25 @@ def init_db():
                 ) ENGINE=InnoDB;
             """)
 
-            # Migration: ensure latitude and longitude columns exist in outages table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS scheduled_outages (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    neighborhood VARCHAR(100) NOT NULL,
+                    title VARCHAR(200) NOT NULL,
+                    description TEXT,
+                    start_time DATETIME NOT NULL,
+                    end_time DATETIME NOT NULL,
+                    status ENUM('SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED') DEFAULT 'SCHEDULED',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_sched_zone (neighborhood, start_time, end_time, status)
+                ) ENGINE=InnoDB;
+            """)
+
+            # Migration: ensure latitude, longitude, outage_type, and schedule_id columns exist in outages table
             cur.execute("""
                 SELECT COLUMN_NAME
                 FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'outages' AND COLUMN_NAME IN ('latitude', 'longitude')
+                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'outages' AND COLUMN_NAME IN ('latitude', 'longitude', 'outage_type', 'schedule_id')
             """, (os.getenv("DB_NAME", "douala_power_alert"),))
             existing_cols = [r["COLUMN_NAME"] if isinstance(r, dict) else r[0] for r in cur.fetchall()]
 
@@ -182,6 +196,10 @@ def init_db():
                 cur.execute("ALTER TABLE outages ADD COLUMN latitude DECIMAL(10, 7) NULL;")
             if "longitude" not in existing_cols:
                 cur.execute("ALTER TABLE outages ADD COLUMN longitude DECIMAL(10, 7) NULL;")
+            if "outage_type" not in existing_cols:
+                cur.execute("ALTER TABLE outages ADD COLUMN outage_type ENUM('UNPLANNED', 'SCHEDULED') DEFAULT 'UNPLANNED';")
+            if "schedule_id" not in existing_cols:
+                cur.execute("ALTER TABLE outages ADD COLUMN schedule_id INT NULL;")
         ensure_admin()
     except Exception as e:
         print(f"Database initialization warning: {e}")

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{{ t('schedules_title') }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 52px; height: 52px; border-radius: var(--radius-md); background: rgba(147, 51, 234, 0.16); border: 1px solid rgba(168, 85, 247, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; box-shadow: 0 0 18px rgba(168, 85, 247, 0.25);">
+                ⚡
+            </div>
+            <div>
+                <h1 style="margin: 0; font-size: 2.1rem; font-weight: 800; letter-spacing: -0.03em;">{{ t('schedules_title') }}</h1>
+                <p class="muted" style="margin: 2px 0 0; font-size: 1.02rem;">{{ t('schedules_subtitle') }}</p>
+            </div>
+        </div>
+        <div>
+            <span class="status-badge" style="background: rgba(147, 51, 234, 0.18); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.45); font-size: 0.88rem; padding: 6px 14px;">
+                ⚡ Calendrier Officiel Eneo
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Integrated Filter Bar -->
+<form method="GET" action="{{ url_for('schedules') }}" class="search-bar" style="margin-bottom: 28px;">
+    <input type="text" name="neighborhood" class="search-input"
+           value="{{ selected_neighborhood }}"
+           placeholder="{{ t('placeholder_neighborhood') }}">
+    <select name="status" class="search-select">
+        <option value="">{{ t('all_statuses') }}</option>
+        <option value="SCHEDULED" {% if selected_status == 'SCHEDULED' %}selected{% endif %}>{{ t('status_scheduled') }}</option>
+        <option value="IN_PROGRESS" {% if selected_status == 'IN_PROGRESS' %}selected{% endif %}>{{ t('status_in_progress') }}</option>
+        <option value="COMPLETED" {% if selected_status == 'COMPLETED' %}selected{% endif %}>{{ t('status_completed') }}</option>
+    </select>
+    <button type="submit" class="btn btn-primary">🔍 {{ t('btn_search') }}</button>
+    {% if selected_neighborhood or selected_status %}
+    <a href="{{ url_for('schedules') }}" class="btn btn-outline">✕</a>
+    {% endif %}
+</form>
+
+{% if schedules %}
+<div class="outage-list">
+    {% for s in schedules %}
+    <div class="outage-card" style="border-left-color: {% if s.status == 'IN_PROGRESS' %}#ef4444{% elif s.status == 'SCHEDULED' %}#a855f7{% else %}#10b981{% endif %};">
+        <div class="outage-header">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <strong style="font-size: 1.25rem; color: #f8fafc;">📍 {{ s.neighborhood | upper }}</strong>
+                <span class="status-badge" style="background: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.45);">
+                    ⚡ {{ t('badge_scheduled_short') }}
+                </span>
+            </div>
+            <span class="status-badge {% if s.status == 'IN_PROGRESS' %}status-verified{% elif s.status == 'SCHEDULED' %}status-pending{% else %}status-restored{% endif %}">
+                {% if s.status == 'IN_PROGRESS' %}🔴 {{ t('status_in_progress') }}
+                {% elif s.status == 'SCHEDULED' %}🕒 {{ t('status_scheduled') }}
+                {% elif s.status == 'COMPLETED' %}🟢 {{ t('status_completed') }}
+                {% else %}{{ s.status }}{% endif %}
+            </span>
+        </div>
+
+        <h3 style="font-size: 1.08rem; font-weight: 700; color: #f1f5f9; margin-bottom: 8px;">
+            {{ s.title }}
+        </h3>
+
+        {% if s.description %}
+            <p class="muted" style="margin-bottom: 12px; font-size: 0.94rem; line-height: 1.5;">
+                {{ s.description }}
+            </p>
+        {% endif %}
+
+        <div class="outage-meta" style="margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--border-glass);">
+            <span>🕒 <strong>{{ t('th_sched_start') }}:</strong> <span style="color: #cbd5e1;">{{ s.start_time }}</span></span>
+            <span>· ⏳ <strong>{{ t('th_sched_end') }}:</strong> <span style="color: #fbbf24;">{{ s.end_time }}</span></span>
+            {% if s.linked_outages_count > 0 %}
+                <span>· 👥 <strong>Signalements liés:</strong> <span style="color: #38bdf8;">{{ s.linked_outages_count }}</span></span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div style="background: var(--bg-card); padding: 50px 30px; border-radius: var(--radius-xl); text-align: center; border: 1px solid var(--border-glass);">
+    <div style="font-size: 2.4rem; margin-bottom: 12px;">⚡</div>
+    <h3 style="color: #f8fafc; font-size: 1.25rem; font-weight: 700; margin-bottom: 6px;">{{ t('no_schedules_found') }}</h3>
+    <p class="muted" style="font-size: 0.95rem; margin-bottom: 20px;">Consultez les coupures en temps réel signalées par la communauté.</p>
+    <a href="{{ url_for('outages') }}" class="btn btn-primary">📍 {{ t('btn_view_outages') }}</a>
+</div>
+{% endif %}
+{% endblock %}

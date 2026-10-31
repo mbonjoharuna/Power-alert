@@ -19,10 +19,12 @@ AI_MODEL = os.getenv("AI_MODEL", "gpt-3.5-turbo")
 def get_outage_context(cursor, lang="fr"):
     """Build a short text summary of current outages from the database in the given language."""
     cursor.execute("""
-        SELECT neighborhood, location, status, start_time, estimated_restore
-        FROM outages
-        WHERE status IN ('PENDING', 'VERIFIED', 'RESTORED')
-        ORDER BY created_at DESC
+        SELECT o.neighborhood, o.location, o.status, o.start_time, o.estimated_restore,
+               o.outage_type, s.title AS schedule_title
+        FROM outages o
+        LEFT JOIN scheduled_outages s ON o.schedule_id = s.id
+        WHERE o.status IN ('PENDING', 'VERIFIED', 'RESTORED')
+        ORDER BY o.created_at DESC
         LIMIT 30
     """)
     rows = cursor.fetchall()
@@ -35,17 +37,19 @@ def get_outage_context(cursor, lang="fr"):
     lines = []
     for r in rows:
         est = r["estimated_restore"]
+        o_type = "Planifié (Eneo)" if r.get("outage_type") == "SCHEDULED" else "Panne imprévue"
         if lang == "fr":
             est_str = est.strftime("%d/%m/%Y à %H:%M") if est else "Aucune estimation vérifiée disponible."
             status_fr = {"PENDING": "En attente", "VERIFIED": "Confirmé (Coupé)", "RESTORED": "Rétabli"}.get(r["status"], r["status"])
             lines.append(
-                f"- {r['neighborhood']} ({r['location']}) : statut={status_fr}, "
+                f"- {r['neighborhood']} ({r['location']}) [{o_type}] : statut={status_fr}, "
                 f"début={r['start_time']}, rétablissement_estimé={est_str}"
             )
         else:
+            o_type_en = "Planned (Eneo)" if r.get("outage_type") == "SCHEDULED" else "Unplanned"
             est_str = est.strftime("%d %B %Y - %H:%M") if est else "No verified restoration estimate is currently available."
             lines.append(
-                f"- {r['neighborhood']} ({r['location']}): status={r['status']}, "
+                f"- {r['neighborhood']} ({r['location']}) [{o_type_en}]: status={r['status']}, "
                 f"started={r['start_time']}, estimated_restore={est_str}"
             )
             
@@ -257,6 +261,40 @@ def _rule_based_answer(question, context, cursor, lang="fr"):
         if prediction:
             ans += "\n\n" + prediction
         return ans
+
+    # 2.5 Scheduled Eneo Maintenance & Rotas inquiries
+    sched_kw = ["planifié", "planifie", "programmé", "programme", "calendrier", "schedule", "maintenance", "travaux", "rotas", "eneo"]
+    if any(w in question for w in sched_kw):
+        query = """
+            SELECT neighborhood, title, start_time, end_time, description, status
+            FROM scheduled_outages
+            WHERE status IN ('SCHEDULED', 'IN_PROGRESS')
+        """
+        params = []
+        if found_neighborhood:
+            query += " AND LOWER(neighborhood) LIKE %s"
+            params.append(f"%{found_neighborhood.lower()}%")
+        query += " ORDER BY start_time ASC LIMIT 5"
+
+        cursor.execute(query, tuple(params))
+        s_rows = cursor.fetchall()
+        if s_rows:
+            if lang == "fr":
+                lines = [
+                    f"⚡ {r['neighborhood']} : {r['title']} (du {r['start_time']} au {r['end_time']})\n   Motif : {r['description'] or 'Entretien du réseau Eneo'}"
+                    for r in s_rows
+                ]
+                return "Calendrier officiel des délestages / maintenances Eneo en cours ou à venir :\n\n" + "\n\n".join(lines)
+            else:
+                lines = [
+                    f"⚡ {r['neighborhood']}: {r['title']} (from {r['start_time']} to {r['end_time']})\n   Details: {r['description'] or 'Eneo grid maintenance'}"
+                    for r in s_rows
+                ]
+                return "Official Eneo scheduled maintenance / load-shedding rotas:\n\n" + "\n\n".join(lines)
+        elif found_neighborhood:
+            if lang == "fr":
+                return f"Aucun délestage ou maintenance Eneo n'est actuellement programmé pour {found_neighborhood.capitalize()}. Les coupures signalées dans cette zone sont donc répertoriées comme des pannes techniques imprévues."
+            return f"No planned Eneo load-shedding is currently scheduled for {found_neighborhood.capitalize()}. Any reported outages are classified as unplanned technical grid failures."
 
     # 3. Restoration time inquiries
     time_kw = ["when", "return", "restore", "restoration", "expected", "quand", "heure", "revenir", "rétablissement", "retablissement", "fin"]

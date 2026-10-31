@@ -2,24 +2,34 @@
 {% block title %}{{ t('outages_title') }} — {{ t('app_name') }}{% endblock %}
 
 {% block content %}
-<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 14px;">
-    <div>
-        <h1>📍 {{ t('outages_title') }}</h1>
-        <p class="muted">{{ t('outages_subtitle') }}</p>
+<div class="page-header" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+        <div>
+            <h1 style="margin: 0; font-size: 2rem; font-weight: 800; letter-spacing: -0.02em;">📍 {{ t('outages_title') }}</h1>
+            <p class="muted" style="margin: 2px 0 0; font-size: 0.96rem;">{{ t('outages_subtitle') }}</p>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <a href="{{ url_for('schedules') }}" class="btn btn-sm btn-outline" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc;">
+                ⚡ {{ t('nav_schedules') }}
+            </a>
+            <a href="{{ url_for('report') }}" class="btn btn-sm btn-primary" style="display: inline-flex; align-items: center; gap: 6px;">
+                ⚠️ {{ t('nav_report') }}
+            </a>
+        </div>
     </div>
-    {% if session.get('user_id') %}
-    <div>
-        <a href="{{ url_for('outages.report') }}" class="btn btn-primary">⚡ {{ t('btn_report_outage') }}</a>
-    </div>
-    {% endif %}
 </div>
 
-<form method="GET" action="{{ url_for('outages.outages') }}" class="search-bar" id="searchForm" style="background: var(--bg-card); padding: 18px 20px; border-radius: var(--radius-lg); border: 1px solid var(--border-glass-light); box-shadow: var(--shadow-md);">
-    <div style="flex: 1; min-width: 220px; position: relative;">
+<form method="GET" action="{{ url_for('outages') }}" class="search-bar" id="filterForm">
+    <div style="position: relative; flex: 1; min-width: 200px;">
         <input type="text" name="q" value="{{ search }}" placeholder="{{ t('search_placeholder') }}"
                class="search-input" id="searchInput" style="width: 100%; padding-left: 42px;">
         <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 1.1rem; color: #94a3b8; pointer-events: none;">🔍</span>
     </div>
+    <select name="type" class="search-select">
+        <option value="">Toutes les natures</option>
+        <option value="SCHEDULED" {% if type_filter == 'SCHEDULED' %}selected{% endif %}>⚡ {{ t('badge_scheduled_short') }} (Eneo)</option>
+        <option value="UNPLANNED" {% if type_filter == 'UNPLANNED' %}selected{% endif %}>⚠️ {{ t('badge_unplanned_short') }} (Panne)</option>
+    </select>
     <select name="status" class="search-select">
         <option value="">{{ t('all_statuses') }}</option>
         <option value="PENDING" {% if status_filter == 'PENDING' %}selected{% endif %}>🟡 {{ t('status_pending') }}</option>
@@ -45,45 +55,66 @@
              data-status="{{ o.status }}"
              style="border-left-color: {% if o.status == 'VERIFIED' %}#ef4444{% elif o.status == 'PENDING' %}#f59e0b{% elif o.status == 'RESTORED' %}#10b981{% else %}#64748b{% endif %};">
             <div class="outage-header">
-                <div style="display: flex; align-items: center; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 1.15rem;">📍</span>
                     <strong>{{ o.neighborhood | upper }}</strong>
+                    {% if o.outage_type == 'SCHEDULED' %}
+                        <span class="status-badge" style="background: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.45); font-size: 0.76rem;" title="{{ o.schedule_title or 'Délestage Eneo' }}">
+                            ⚡ {{ t('badge_scheduled_short') }}
+                        </span>
+                    {% else %}
+                        <span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); font-size: 0.76rem;">
+                            ⚠️ {{ t('badge_unplanned_short') }}
+                        </span>
+                    {% endif %}
                 </div>
-                <span class="status-badge status-{{ o.status | lower }}">
-                    {% if o.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
-                    {% elif o.status == 'PENDING' %}🟡 {{ t('status_pending') }}
-                    {% elif o.status == 'RESTORED' %}🟢 {{ t('status_restored') }}
-                    {% else %}{{ o.status }}{% endif %}
-                </span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <span class="status-badge status-{{ o.status | lower }}">
+                        {% if o.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
+                        {% elif o.status == 'PENDING' %}🟡 {{ t('status_pending') }}
+                        {% elif o.status == 'RESTORED' %}🟢 {{ t('status_restored') }}
+                        {% elif o.status == 'REJECTED' %}⚪ {{ t('status_rejected') }}
+                        {% else %}{{ o.status }}{% endif %}
+                    </span>
+                    {% if o.conf_count and o.conf_count >= 3 %}
+                    <span class="status-badge" style="background: rgba(37, 99, 235, 0.18); color: #93c5fd; border: 1px solid rgba(37, 99, 235, 0.35); font-size: 0.78rem;">
+                        👥 {{ o.conf_count }}
+                    </span>
+                    {% endif %}
+                </div>
             </div>
-            <p style="font-size: 1rem; margin-bottom: 6px; color: #f8fafc;">
-                <span style="color: #94a3b8; font-weight: 600;">{{ t('th_location') }} :</span> {{ o.location }}
+
+            <p style="font-size: 0.98rem; margin-bottom: 6px; color: #f1f5f9;">
+                <strong style="color: #cbd5e1;">{{ t('th_location') }}:</strong> {{ o.location }}
             </p>
             {% if o.description %}
-            <p style="color: #94a3b8; font-size: 0.92rem; margin-bottom: 10px; background: rgba(255, 255, 255, 0.03); padding: 8px 12px; border-radius: 8px; border-left: 2px solid rgba(255, 255, 255, 0.1);">
-                {{ o.description }}
-            </p>
+                <p class="muted" style="margin-bottom: 10px; font-size: 0.93rem;">{{ o.description }}</p>
             {% endif %}
-            <p class="outage-meta">
-                <span>🕒 {{ t('reported_on') }}: {{ o.start_time }}</span>
+
+            <div class="outage-meta">
+                <span>🕒 {{ t('th_time_off') }}: <strong style="color: #cbd5e1;">{{ o.start_time }}</strong></span>
                 {% if o.estimated_restore %}
-                    <span>· ⏳ {{ t('est_restoration') }}: <strong style="color: #fde047;">{{ o.estimated_restore }}</strong></span>
+                    <span>· ⏳ {{ t('est_restoration') }}: <strong style="color: #fbbf24;">{{ o.estimated_restore }}</strong></span>
                 {% endif %}
-                <span>· 👥 {{ t('confirmations_count') }}: {{ o.conf_count }}</span>
-            </p>
-            {% if o.estimated_restore and o.status != 'RESTORED' %}
-            <p class="estimate-note">⚠️ {{ t('estimate_disclaimer') }}</p>
-            {% endif %}
-            <div style="margin-top: 12px; display: flex; gap: 10px;">
-                <a href="{{ url_for('outages.outage_details', outage_id=o.id) }}" class="btn btn-sm btn-outline">{{ t('btn_view_details') }} →</a>
+            </div>
+
+            <div style="margin-top: 14px; display: flex; justify-content: space-between; align-items: center;">
+                <a href="{{ url_for('outages.outage_details', outage_id=o.id) }}" class="btn btn-sm btn-outline" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
+                    {{ t('btn_view_details') }} →
+                </a>
+                {% if o.schedule_title %}
+                <span class="muted" style="font-size: 0.8rem; color: #c084fc;">
+                    ⚡ {{ o.schedule_title }}
+                </span>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
     {% else %}
-        <div class="detail-card" style="text-align: center; padding: 48px 24px;">
-            <div style="font-size: 2.5rem; margin-bottom: 12px;">🔍</div>
-            <h3 style="font-size: 1.25rem; font-weight: 800; color: #f8fafc; margin-bottom: 8px;">{{ t('no_outages_found') }}</h3>
-            <p class="muted">Aucun signalement ne correspond à vos critères de recherche.</p>
+        <div style="background: var(--bg-card); padding: 48px 32px; border-radius: var(--radius-xl); text-align: center; border: 1px solid var(--border-glass);">
+            <div style="font-size: 2.2rem; margin-bottom: 12px;">⚡</div>
+            <p class="muted" style="font-size: 1.05rem; margin-bottom: 18px;">{{ t('no_outages_found') }}</p>
+            <a href="{{ url_for('outages.report') }}" class="btn btn-primary">⚠️ {{ t('btn_report_outage') }}</a>
         </div>
     {% endif %}
 </div>
@@ -92,9 +123,7 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        if (typeof initOutageMap === 'function') {
-            initOutageMap('map');
-        }
+        initOutageMap('map');
     });
 </script>
 {% endblock %}

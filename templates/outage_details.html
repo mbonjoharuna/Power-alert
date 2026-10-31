@@ -12,6 +12,15 @@
             <h1 style="margin: 2px 0 0; font-size: 2rem; font-weight: 800; letter-spacing: -0.02em;">📍 {{ outage.neighborhood | upper }}</h1>
         </div>
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            {% if outage.outage_type == 'SCHEDULED' %}
+            <span class="status-badge" style="background: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.45); box-shadow: 0 0 12px rgba(168, 85, 247, 0.25);">
+                ⚡ {{ t('badge_scheduled') }}
+            </span>
+            {% else %}
+            <span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35);">
+                ⚠️ {{ t('badge_unplanned') }}
+            </span>
+            {% endif %}
             <span class="status-badge status-{{ outage.status | lower }}">
                 {% if outage.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
                 {% elif outage.status == 'PENDING' %}🟡 {{ t('status_pending') }}
@@ -64,6 +73,24 @@
                         <div class="estimate-note" style="margin-top: 6px;">⚠️ {{ t('estimate_disclaimer') }}</div>
                     {% else %}
                         <span class="muted">{{ t('no_estimate_available') }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>⚡ Nature de l'incident</th>
+                <td>
+                    {% if outage.outage_type == 'SCHEDULED' %}
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <strong style="color: #c084fc;">⚡ {{ t('badge_scheduled') }}</strong>
+                            {% if outage.schedule_title %}
+                                <span class="muted">— {{ outage.schedule_title }}</span>
+                            {% endif %}
+                            <a href="{{ url_for('schedules') }}" class="btn btn-sm btn-outline" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc; font-size: 0.8rem; padding: 2px 8px;">
+                                Voir calendrier →
+                            </a>
+                        </div>
+                    {% else %}
+                        <strong style="color: #fca5a5;">⚠️ {{ t('badge_unplanned') }}</strong>
                     {% endif %}
                 </td>
             </tr>

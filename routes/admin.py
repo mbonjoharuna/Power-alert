@@ -1,7 +1,7 @@
 """
 Admin Blueprint for Douala Power Alert.
 Handles administrator authentication, dashboard oversight, outage approvals,
-rejections, restoration completions, and estimate adjustments.
+rejections, restoration completions, estimate adjustments, and Eneo maintenance schedule imports.
 """
 
 from datetime import datetime
@@ -14,6 +14,15 @@ from database import get_db_cursor
 from translations import get_text
 from routes.utils import admin_required, get_current_lang
 from services.notification_service import create_neighborhood_notification
+from services.schedule_service import (
+    create_schedule,
+    get_all_schedules,
+    delete_schedule,
+    import_schedules_from_csv,
+    import_schedules_from_json,
+    load_sample_douala_schedules,
+    correlate_all_outages_with_schedules
+)
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -83,10 +92,14 @@ def admin_dashboard():
             cur.execute("SELECT COUNT(*) AS c FROM outages WHERE status = 'RESTORED'")
             restored = cur.fetchone()["c"]
 
+            cur.execute("SELECT COUNT(*) AS c FROM scheduled_outages WHERE status IN ('SCHEDULED', 'IN_PROGRESS')")
+            active_schedules_count = cur.fetchone()["c"]
+
             cur.execute("""
-                SELECT o.*, u.full_name, u.email
+                SELECT o.*, u.full_name, u.email, s.title AS schedule_title
                 FROM outages o
                 JOIN users u ON o.user_id = u.id
+                LEFT JOIN scheduled_outages s ON o.schedule_id = s.id
                 ORDER BY
                     CASE o.status
                         WHEN 'PENDING' THEN 1
@@ -106,6 +119,7 @@ def admin_dashboard():
             pending=pending,
             verified=verified,
             restored=restored,
+            active_schedules_count=active_schedules_count,
             reports=reports,
         )
     except Error:
@@ -113,7 +127,7 @@ def admin_dashboard():
         return render_template(
             "admin/admin_dashboard.html",
             total_users=0, total_reports=0, pending=0,
-            verified=0, restored=0, reports=[],
+            verified=0, restored=0, active_schedules_count=0, reports=[],
         )
 
 
@@ -164,7 +178,7 @@ def admin_reject(outage_id):
 @admin_bp.route("/admin/restore/<int:outage_id>", methods=["POST"])
 @admin_required
 def admin_restore(outage_id):
-    """Mark an outage as RESTORED and dispatch neighborhood notifications."""
+    """Mark an outage as resolved/restored and dispatch celebratory alert."""
     lang = get_current_lang()
     try:
         with get_db_cursor(commit=True) as cur:
@@ -191,11 +205,12 @@ def admin_restore(outage_id):
 @admin_bp.route("/admin/update/<int:outage_id>", methods=["POST"])
 @admin_required
 def admin_update(outage_id):
-    """Update estimated restoration datetime and alert neighborhood residents."""
+    """Update the estimated restoration time and notify affected neighborhood."""
     lang = get_current_lang()
     estimate_str = request.form.get("estimated_restore", "").strip()
+
     if not estimate_str:
-        flash(get_text("msg_provide_estimate", lang=lang), "warning")
+        flash(get_text("msg_invalid_datetime", lang=lang), "danger")
         return redirect(url_for("admin.admin_dashboard"))
 
     try:
@@ -239,3 +254,110 @@ def admin_delete(outage_id):
     except Error:
         flash(get_text("msg_db_error", lang=lang), "danger")
     return redirect(url_for("admin.admin_dashboard"))
+
+
+@admin_bp.route("/admin/outages/<int:outage_id>/toggle-type", methods=["POST"])
+@admin_required
+def admin_toggle_type(outage_id):
+    """Toggle an outage between SCHEDULED (Planifié) and UNPLANNED (Imprévu)."""
+    lang = get_current_lang()
+    try:
+        with get_db_cursor(commit=True) as cur:
+            cur.execute("SELECT outage_type FROM outages WHERE id = %s", (outage_id,))
+            row = cur.fetchone()
+            if row:
+                current_type = row.get("outage_type") or "UNPLANNED"
+                new_type = "UNPLANNED" if current_type == "SCHEDULED" else "SCHEDULED"
+                cur.execute("UPDATE outages SET outage_type = %s WHERE id = %s", (new_type, outage_id))
+                flash(f"Statut modifié : {new_type}", "success")
+    except Exception as e:
+        flash(f"Erreur : {e}", "danger")
+    return redirect(url_for("admin.admin_dashboard"))
+
+
+# ===========================================================================
+# Eneo Scheduled Maintenance & Rotas Management
+# ===========================================================================
+
+@admin_bp.route("/admin/schedules")
+@admin_required
+def admin_schedules():
+    """View and manage Eneo scheduled load-shedding and maintenance slots."""
+    schedules = get_all_schedules()
+    return render_template("admin/admin_schedules.html", schedules=schedules)
+
+
+@admin_bp.route("/admin/schedules/create", methods=["POST"])
+@admin_required
+def admin_create_schedule():
+    """Create a new single Eneo maintenance schedule."""
+    neighborhood = request.form.get("neighborhood", "").strip()
+    title = request.form.get("title", "").strip()
+    start_time = request.form.get("start_time", "").strip()
+    end_time = request.form.get("end_time", "").strip()
+    description = request.form.get("description", "").strip()
+    status = request.form.get("status", "SCHEDULED").strip()
+
+    if not all([neighborhood, title, start_time, end_time]):
+        flash("Veuillez remplir tous les champs obligatoires pour la maintenance.", "danger")
+        return redirect(url_for("admin.admin_schedules"))
+
+    try:
+        create_schedule(neighborhood, title, start_time, end_time, description, status)
+        flash(f"Maintenance planifiée ajoutée pour {neighborhood} !", "success")
+    except Exception as e:
+        flash(f"Erreur lors de l'enregistrement : {e}", "danger")
+
+    return redirect(url_for("admin.admin_schedules"))
+
+
+@admin_bp.route("/admin/schedules/import", methods=["POST"])
+@admin_required
+def admin_import_schedules():
+    """Import schedule records from uploaded CSV/JSON file or raw text."""
+    uploaded_file = request.files.get("file")
+    raw_text = request.form.get("raw_text", "").strip()
+
+    count = 0
+    try:
+        if uploaded_file and uploaded_file.filename:
+            content = uploaded_file.read().decode("utf-8")
+            if uploaded_file.filename.endswith(".json"):
+                count = import_schedules_from_json(content)
+            else:
+                count = import_schedules_from_csv(content)
+        elif raw_text:
+            if raw_text.startswith("["):
+                count = import_schedules_from_json(raw_text)
+            else:
+                count = import_schedules_from_csv(raw_text)
+
+        flash(f"Succès ! {count} créneau(x) de maintenance Eneo importé(s).", "success")
+    except Exception as e:
+        flash(f"Erreur lors de l'import : {e}", "danger")
+
+    return redirect(url_for("admin.admin_schedules"))
+
+
+@admin_bp.route("/admin/schedules/load-samples", methods=["POST"])
+@admin_required
+def admin_load_samples():
+    """Load sample Eneo maintenance and load-shedding rotas across Douala."""
+    try:
+        count = load_sample_douala_schedules()
+        flash(f"{count} programmes de maintenance Eneo types ont été chargés avec succès !", "success")
+    except Exception as e:
+        flash(f"Erreur : {e}", "danger")
+    return redirect(url_for("admin.admin_schedules"))
+
+
+@admin_bp.route("/admin/schedules/<int:schedule_id>/delete", methods=["POST"])
+@admin_required
+def admin_delete_schedule(schedule_id):
+    """Delete a scheduled outage slot."""
+    try:
+        delete_schedule(schedule_id)
+        flash("Créneau de maintenance supprimé.", "info")
+    except Exception as e:
+        flash(f"Erreur : {e}", "danger")
+    return redirect(url_for("admin.admin_schedules"))

@@ -40,7 +40,52 @@
     </div>
 </div>
 
-<!-- 2. Interactive Heatmap Section -->
+<!-- 2. Comparative Ratio: Planifié vs Imprévu (Eneo vs Pannes) -->
+<section class="section" style="margin-top: 24px; margin-bottom: 32px;">
+    <div style="background: var(--bg-card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: var(--radius-xl); border: 1px solid var(--border-glass-light); padding: 24px 28px; box-shadow: var(--shadow-lg);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.4rem;">⚖️</span>
+                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #f8fafc;">
+                    {{ t('stat_planned_vs_unplanned') }}
+                </h3>
+            </div>
+            <a href="{{ url_for('schedules') }}" class="btn btn-sm btn-outline" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc;">
+                ⚡ {{ t('nav_schedules') }} →
+            </a>
+        </div>
+
+        <!-- Comparative Split Progress Bar -->
+        <div style="background: rgba(255, 255, 255, 0.08); border-radius: 9999px; height: 16px; width: 100%; overflow: hidden; display: flex; margin-bottom: 18px; border: 1px solid rgba(255, 255, 255, 0.1);">
+            <div style="background: linear-gradient(90deg, #9333ea, #c084fc); width: {{ planned_percent }}%; height: 100%; transition: width 0.6s ease;" title="Planifié: {{ planned_percent }}%"></div>
+            <div style="background: linear-gradient(90deg, #f97316, #ef4444); width: {{ unplanned_percent }}%; height: 100%; transition: width 0.6s ease;" title="Imprévu: {{ unplanned_percent }}%"></div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px;">
+            <div style="background: rgba(147, 51, 234, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: var(--radius-md); padding: 14px 18px;">
+                <div style="font-size: 0.84rem; font-weight: 700; color: #c084fc; text-transform: uppercase; letter-spacing: 0.03em;">
+                    ⚡ {{ t('stat_planned') }}
+                </div>
+                <div style="font-size: 1.7rem; font-weight: 800; color: #f8fafc; margin: 4px 0;">
+                    {{ planned_outages }} <span style="font-size: 0.95rem; font-weight: 600; color: #c084fc;">({{ planned_percent }}%)</span>
+                </div>
+                <div class="muted" style="font-size: 0.8rem;">Maintenance officielle et délestages tournants programmés</div>
+            </div>
+
+            <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: var(--radius-md); padding: 14px 18px;">
+                <div style="font-size: 0.84rem; font-weight: 700; color: #fca5a5; text-transform: uppercase; letter-spacing: 0.03em;">
+                    ⚠️ {{ t('stat_unplanned') }}
+                </div>
+                <div style="font-size: 1.7rem; font-weight: 800; color: #f8fafc; margin: 4px 0;">
+                    {{ unplanned_outages }} <span style="font-size: 0.95rem; font-weight: 600; color: #fca5a5;">({{ unplanned_percent }}%)</span>
+                </div>
+                <div class="muted" style="font-size: 0.8rem;">Pannes techniques, chutes de poteaux, câbles rompus</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 3. Interactive Heatmap Section -->
 <section class="section" style="margin-top: 36px;">
     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap; gap: 14px;">
         <div>
@@ -66,7 +111,7 @@
     <div id="analyticsMap" style="height: 460px; width: 100%; border-radius: var(--radius-xl); border: 1.5px solid rgba(255, 255, 255, 0.14); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6); z-index: 1;"></div>
 </section>
 
-<!-- 3. Neighborhood Severity Ranking Table -->
+<!-- 4. Neighborhood Severity Ranking Table -->
 <section class="section" style="margin-top: 44px; margin-bottom: 30px;">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
         <h2 style="font-size: 1.45rem; font-weight: 800; color: #f8fafc; margin: 0; letter-spacing: -0.01em;">
@@ -81,8 +126,9 @@
             <thead>
                 <tr>
                     <th>{{ t('th_neighborhood') }}</th>
-                    <th style="min-width: 150px;">Impact</th>
+                    <th style="min-width: 130px;">Impact</th>
                     <th>{{ t('th_total_outages') }}</th>
+                    <th>Planifiés / Imprévus</th>
                     <th>{{ t('th_active_outages') }}</th>
                     <th>{{ t('th_restored_outages') }}</th>
                     <th>{{ t('th_avg_duration') }}</th>
@@ -101,6 +147,13 @@
                         </div>
                     </td>
                     <td><strong style="color: #cbd5e1;">{{ n.total }}</strong></td>
+                    <td>
+                        <div style="display: flex; gap: 6px; align-items: center; font-size: 0.85rem;">
+                            <span style="color: #c084fc; font-weight: 700;">⚡ {{ n.planned }}</span>
+                            <span class="muted">/</span>
+                            <span style="color: #fca5a5; font-weight: 700;">⚠️ {{ n.total - n.planned }}</span>
+                        </div>
+                    </td>
                     <td>
                         {% if n.active > 0 %}
                             <span style="color: #f87171; font-weight: 800;">🔴 {{ n.active }}</span>
@@ -160,6 +213,8 @@
             .then(function (markers) {
                 markers.forEach(function (m) {
                     var color = m.status === 'RESTORED' ? '#10b981' : (m.status === 'PENDING' ? '#f59e0b' : '#ef4444');
+                    var typeLabel = m.outage_type === 'SCHEDULED' ? '⚡ Planifié (Eneo)' : '⚠️ Panne Imprévue';
+
                     var iconHtml = '<div class="custom-marker-wrap">' +
                         '<div class="marker-core" style="background:' + color + '; width:14px; height:14px;"></div>' +
                     '</div>';
@@ -176,6 +231,7 @@
                         '<div style="font-family: inherit;">' +
                             '<strong style="font-size: 1rem; color: #f8fafc;">' + m.neighborhood + '</strong><br>' +
                             '<span style="font-size: 0.85rem; color:#94a3b8;">' + m.location + '</span><br>' +
+                            '<span style="display:inline-block; margin: 4px 0; font-size:0.78rem; font-weight:700; color:#c084fc;">' + typeLabel + '</span><br>' +
                             '<span style="font-weight:700; font-size:0.85rem; color:' + color + ';">' + m.status + '</span>' +
                         '</div>'
                     );

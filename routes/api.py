@@ -120,14 +120,16 @@ def api_analytics_heatmap():
 
 @api_bp.route("/api/outages/map")
 def api_map_outages():
-    """Return outages with exact coordinates or fallback center points for simple map markers."""
+    """Return outages with exact coordinates or fallback center points, including planned/unplanned status."""
     try:
         with get_db_cursor() as cur:
             cur.execute("""
-                SELECT id, neighborhood, location, status, latitude, longitude
-                FROM outages
-                WHERE status IN ('PENDING', 'VERIFIED', 'RESTORED')
-                ORDER BY created_at DESC
+                SELECT o.id, o.neighborhood, o.location, o.status, o.latitude, o.longitude,
+                       o.outage_type, s.title AS schedule_title
+                FROM outages o
+                LEFT JOIN scheduled_outages s ON o.schedule_id = s.id
+                WHERE o.status IN ('PENDING', 'VERIFIED', 'RESTORED')
+                ORDER BY o.created_at DESC
                 LIMIT 100
             """)
             rows = cur.fetchall()
@@ -148,11 +150,43 @@ def api_map_outages():
                 "neighborhood": r["neighborhood"],
                 "location": r["location"],
                 "status": r["status"],
+                "outage_type": r.get("outage_type") or "UNPLANNED",
+                "schedule_title": r.get("schedule_title") or "",
                 "lat": lat,
                 "lng": lng,
             })
         return jsonify(markers)
     except Error:
+        return jsonify([])
+
+
+@api_bp.route("/api/schedules/active")
+def api_active_schedules():
+    """Return active or upcoming scheduled Eneo maintenance windows."""
+    try:
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT id, neighborhood, title, description, start_time, end_time, status
+                FROM scheduled_outages
+                WHERE status IN ('SCHEDULED', 'IN_PROGRESS')
+                ORDER BY start_time ASC
+                LIMIT 20
+            """)
+            rows = cur.fetchall()
+
+        result = []
+        for r in rows:
+            result.append({
+                "id": r["id"],
+                "neighborhood": r["neighborhood"],
+                "title": r["title"],
+                "description": r["description"] or "",
+                "start_time": str(r["start_time"]),
+                "end_time": str(r["end_time"]),
+                "status": r["status"]
+            })
+        return jsonify(result)
+    except Exception:
         return jsonify([])
 
 

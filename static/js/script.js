@@ -209,14 +209,20 @@ function initOutageMap(elementId) {
                 popupAnchor: [0, -10]
             });
 
+            var typeLabel = m.outage_type === 'SCHEDULED' ? '⚡ ' + (getLang() === 'fr' ? 'Délestage Planifié (Eneo)' : 'Planned Load-Shedding') : '⚠️ ' + (getLang() === 'fr' ? 'Panne Imprévue' : 'Unplanned Outage');
+            var typeBadgeColor = m.outage_type === 'SCHEDULED' ? '#c084fc' : '#fca5a5';
+
             var marker = L.marker([m.lat, m.lng], { icon: icon }).addTo(map);
             marker.bindPopup(
                 '<div style="font-family: inherit;">' +
-                    '<div style="font-size:1rem; font-weight:800; color:#f8fafc; margin-bottom:4px;">' +
+                    '<div style="font-size:1rem; font-weight:800; color:#f8fafc; margin-bottom:2px;">' +
                         m.neighborhood +
                     '</div>' +
-                    '<div style="color:#94a3b8; font-size:0.85rem; margin-bottom:8px;">' +
+                    '<div style="color:#94a3b8; font-size:0.85rem; margin-bottom:6px;">' +
                         m.location +
+                    '</div>' +
+                    '<div style="font-size:0.78rem; font-weight:700; color:' + typeBadgeColor + '; margin-bottom:6px;">' +
+                        typeLabel +
                     '</div>' +
                     '<div style="font-weight:700; font-size:0.85rem; margin-bottom:8px;">' +
                         label +

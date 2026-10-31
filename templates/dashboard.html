@@ -62,9 +62,18 @@
             {% for o in recent %}
             <div class="outage-card" style="border-left-color: {% if o.status == 'VERIFIED' %}#ef4444{% elif o.status == 'PENDING' %}#f59e0b{% elif o.status == 'RESTORED' %}#10b981{% else %}#64748b{% endif %};">
                 <div class="outage-header">
-                    <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                         <span style="font-size: 1.15rem;">📍</span>
                         <strong>{{ o.neighborhood | upper }}</strong>
+                        {% if o.outage_type == 'SCHEDULED' %}
+                            <span class="status-badge" style="background: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.45); font-size: 0.76rem;">
+                                ⚡ {{ t('badge_scheduled_short') }}
+                            </span>
+                        {% else %}
+                            <span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); font-size: 0.76rem;">
+                                ⚠️ {{ t('badge_unplanned_short') }}
+                            </span>
+                        {% endif %}
                     </div>
                     <span class="status-badge status-{{ o.status | lower }}">
                         {% if o.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
