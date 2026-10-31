@@ -4,8 +4,13 @@
 {% block content %}
 <div class="form-page">
     <div class="form-card">
-        <h1>🛡️ {{ t('admin_login_title') }}</h1>
-        <p class="muted">{{ t('admin_login_hint') | safe }}</p>
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div style="width: 58px; height: 58px; margin: 0 auto 14px; border-radius: var(--radius-full); background: rgba(239, 68, 68, 0.16); border: 1px solid rgba(239, 68, 68, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 0 20px rgba(239, 68, 68, 0.25);">
+                🛡️
+            </div>
+            <h1 style="font-size: 1.85rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 6px;">{{ t('admin_login_title') }}</h1>
+            <p class="muted" style="margin: 0; font-size: 0.92rem;">{{ t('admin_login_hint') | safe }}</p>
+        </div>
 
         <form method="POST" action="{{ url_for('admin_login') }}" style="margin-top: 20px;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -20,8 +25,14 @@
                     <button type="button" class="password-toggle-btn" data-target="password" title="Show password">👁️</button>
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">🚀 {{ t('btn_admin_login') }}</button>
+            <button type="submit" class="btn btn-primary btn-block" style="padding: 13px; font-size: 1.02rem; margin-top: 8px; box-shadow: 0 4px 18px rgba(37, 99, 235, 0.45);">
+                🚀 {{ t('btn_admin_login') }}
+            </button>
         </form>
+
+        <p class="form-footer" style="margin-top: 24px; border-top: 1px solid var(--border-glass); padding-top: 18px;">
+            <a href="{{ url_for('index') }}" style="color: #64748b; font-size: 0.88rem;">← Retour au portail citoyen</a>
+        </p>
     </div>
 </div>
 {% endblock %}

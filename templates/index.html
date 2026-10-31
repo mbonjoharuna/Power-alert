@@ -4,7 +4,13 @@
 {% block content %}
 <section class="hero">
     <div class="hero-text">
-        <h1>{{ t('hero_title') }}</h1>
+        <div style="margin-bottom: 14px;">
+            <span class="hero-live-badge" style="background: rgba(37, 99, 235, 0.18); border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
+                <span class="pulse-dot" style="background: #38bdf8; box-shadow: 0 0 10px #38bdf8;"></span>
+                <span>⚡ {{ t('app_name') }} • Douala, Cameroun</span>
+            </span>
+        </div>
+        <h1><span>{{ t('hero_title') }}</span></h1>
         <p class="lead">
             {{ t('hero_lead') }}
         </p>
@@ -13,11 +19,13 @@
         </p>
         <div class="hero-actions">
             {% if session.get('user_id') %}
-                <a href="{{ url_for('report') }}" class="btn btn-primary">⚡ {{ t('btn_report_outage') }}</a>
-                <a href="{{ url_for('outages') }}" class="btn btn-outline">📍 {{ t('btn_view_outages') }}</a>
+                <a href="{{ url_for('outages.report') }}" class="btn btn-primary">⚡ {{ t('btn_report_outage') }}</a>
+                <a href="{{ url_for('outages.outages') }}" class="btn btn-outline">📍 {{ t('btn_view_outages') }}</a>
+                <a href="{{ url_for('outages.analytics') }}" class="btn btn-outline">📊 {{ t('nav_analytics') }}</a>
             {% else %}
-                <a href="{{ url_for('register') }}" class="btn btn-primary">🚀 {{ t('btn_get_started') }}</a>
-                <a href="{{ url_for('outages') }}" class="btn btn-outline">📍 {{ t('btn_view_outages') }}</a>
+                <a href="{{ url_for('auth.register') }}" class="btn btn-primary">🚀 {{ t('btn_get_started') }}</a>
+                <a href="{{ url_for('outages.outages') }}" class="btn btn-outline">📍 {{ t('btn_view_outages') }}</a>
+                <a href="{{ url_for('outages.analytics') }}" class="btn btn-outline">📊 {{ t('nav_analytics') }}</a>
             {% endif %}
         </div>
     </div>
@@ -28,12 +36,22 @@
                 <span>{{ t('hero_badge') }}</span>
             </div>
             <p>{{ t('hero_badge_sub') }}</p>
+            <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1); display: grid; grid-template-columns: 1fr 1fr; gap: 12px; text-align: left;">
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);">
+                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Couverture</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; margin-top: 2px;">17 Quartiers</div>
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.05); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08);">
+                    <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Communauté</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #10b981; margin-top: 2px;">Temps Réel</div>
+                </div>
+            </div>
         </div>
     </div>
 </section>
 
 <section class="features">
-    <h2>{{ t('how_it_works') }}</h2>
+    <h2>⚡ {{ t('how_it_works') }}</h2>
     <div class="feature-grid">
         <div class="feature-card">
             <div class="feature-icon-wrap">📝</div>
@@ -41,17 +59,17 @@
             <p>{{ t('feature_report_desc') }}</p>
         </div>
         <div class="feature-card">
-            <div class="feature-icon-wrap">✅</div>
+            <div class="feature-icon-wrap" style="background: rgba(16, 185, 129, 0.16); border-color: rgba(16, 185, 129, 0.35);">✅</div>
             <h3>{{ t('feature_confirm_title') }}</h3>
             <p>{{ t('feature_confirm_desc') }}</p>
         </div>
         <div class="feature-card">
-            <div class="feature-icon-wrap">🗺️</div>
+            <div class="feature-icon-wrap" style="background: rgba(245, 158, 11, 0.16); border-color: rgba(245, 158, 11, 0.35);">🗺️</div>
             <h3>{{ t('feature_map_title') }}</h3>
             <p>{{ t('feature_map_desc') }}</p>
         </div>
         <div class="feature-card">
-            <div class="feature-icon-wrap">🤖</div>
+            <div class="feature-icon-wrap" style="background: rgba(14, 165, 233, 0.16); border-color: rgba(14, 165, 233, 0.35);">🤖</div>
             <h3>{{ t('feature_ai_title') }}</h3>
             <p>{{ t('feature_ai_desc') }}</p>
         </div>
@@ -59,8 +77,15 @@
 </section>
 
 <section class="map-section">
-    <h2>{{ t('map_title') }}</h2>
-    <p class="muted">{{ t('map_legend') }}</p>
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+        <div>
+            <h2>📍 {{ t('map_title') }}</h2>
+            <p class="muted">{{ t('map_legend') }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('outages.analytics') }}" class="btn btn-sm btn-outline" style="border-color: rgba(245, 158, 11, 0.4); color: #fde047;">🔥 {{ t('heatmap_title') }} →</a>
+        </div>
+    </div>
     <div id="map" class="map-container"></div>
 </section>
 {% endblock %}

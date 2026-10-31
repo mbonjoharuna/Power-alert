@@ -4,30 +4,37 @@
 {% block content %}
 <div class="form-page">
     <div class="form-card">
-        <h1>🔐 {{ t('login_title') }}</h1>
-        <p class="muted">{{ t('login_subtitle') }}</p>
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div style="width: 58px; height: 58px; margin: 0 auto 14px; border-radius: var(--radius-full); background: rgba(37, 99, 235, 0.16); border: 1px solid rgba(56, 189, 248, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.8rem; box-shadow: 0 0 20px rgba(37, 99, 235, 0.3);">
+                🔐
+            </div>
+            <h1 style="font-size: 1.85rem; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 6px;">{{ t('login_title') }}</h1>
+            <p class="muted" style="margin: 0; font-size: 0.95rem;">{{ t('login_subtitle') }}</p>
+        </div>
 
-        <form method="POST" action="{{ url_for('login') }}" id="loginForm" novalidate style="margin-top: 20px;">
+        <form method="POST" action="{{ url_for('login') }}" id="loginForm" novalidate style="margin-top: 18px;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
-                <label for="email">{{ t('label_email') }}</label>
+                <label for="email">📧 {{ t('label_email') }}</label>
                 <input type="email" id="email" name="email" required
                        value="{{ email if email else '' }}"
                        placeholder="{{ t('placeholder_email') }}">
             </div>
             <div class="form-group">
-                <label for="password">{{ t('label_password') }}</label>
+                <label for="password">🔑 {{ t('label_password') }}</label>
                 <div class="input-icon-wrap">
                     <input type="password" id="password" name="password" required
                            placeholder="{{ t('placeholder_login_password') }}">
                     <button type="button" class="password-toggle-btn" data-target="password" title="Show password">👁️</button>
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">🚀 {{ t('btn_login') }}</button>
+            <button type="submit" class="btn btn-primary btn-block" style="padding: 13px; font-size: 1.02rem; margin-top: 8px; box-shadow: 0 4px 18px rgba(37, 99, 235, 0.45);">
+                🚀 {{ t('btn_login') }}
+            </button>
         </form>
-        <p class="form-footer">
-            {{ t('no_account_yet') }} <a href="{{ url_for('register') }}"><strong>{{ t('nav_register') }}</strong></a><br>
-            <a href="{{ url_for('admin_login') }}">{{ t('admin_login_link') }}</a>
+        <p class="form-footer" style="line-height: 1.7; margin-top: 26px; border-top: 1px solid var(--border-glass); padding-top: 18px;">
+            {{ t('no_account_yet') }} <a href="{{ url_for('register') }}" style="color: #38bdf8; font-weight: 700;">{{ t('nav_register') }}</a><br>
+            <a href="{{ url_for('admin_login') }}" style="font-size: 0.86rem; color: #64748b; margin-top: 6px; display: inline-block;">{{ t('admin_login_link') }}</a>
         </p>
     </div>
 </div>

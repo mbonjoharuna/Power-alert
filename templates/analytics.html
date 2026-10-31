@@ -2,31 +2,38 @@
 {% block title %}{{ t('analytics_title') }} — {{ t('app_name') }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>📊 {{ t('analytics_title') }}</h1>
-    <p class="muted">{{ t('analytics_subtitle') }}</p>
+<div class="page-header" style="margin-bottom: 28px;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 52px; height: 52px; border-radius: var(--radius-md); background: rgba(56, 189, 248, 0.16); border: 1px solid rgba(56, 189, 248, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; box-shadow: 0 0 18px rgba(56, 189, 248, 0.25);">
+            📊
+        </div>
+        <div>
+            <h1 style="margin: 0; font-size: 2.1rem; font-weight: 800; letter-spacing: -0.03em;">{{ t('analytics_title') }}</h1>
+            <p class="muted" style="margin: 2px 0 0; font-size: 1.02rem;">{{ t('analytics_subtitle') }}</p>
+        </div>
+    </div>
 </div>
 
 <!-- 1. Top Metrics Grid -->
 <div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-number">{{ total_outages }}</div>
+    <div class="stat-card" style="border-top: 3px solid #38bdf8;">
+        <div class="stat-number" style="color: #38bdf8;">{{ total_outages }}</div>
         <div class="stat-label">⚡ {{ t('th_total_outages') }}</div>
     </div>
-    <div class="stat-card highlight">
-        <div class="stat-number">{{ active_outages }}</div>
+    <div class="stat-card highlight" style="border-top: 3px solid #ef4444;">
+        <div class="stat-number" style="color: #ef4444;">{{ active_outages }}</div>
         <div class="stat-label">🔴 {{ t('th_active_outages') }}</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-number">{{ resolution_rate }}%</div>
+    <div class="stat-card" style="border-top: 3px solid #10b981;">
+        <div class="stat-number" style="color: #10b981;">{{ resolution_rate }}%</div>
         <div class="stat-label">🟢 {{ t('stat_resolution_rate') }}</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-number">{{ avg_duration_hours }}h</div>
+    <div class="stat-card" style="border-top: 3px solid #f59e0b;">
+        <div class="stat-number" style="color: #f59e0b;">{{ avg_duration_hours }}h</div>
         <div class="stat-label">⏳ {{ t('stat_avg_duration') }}</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-number" style="font-size: 1.5rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+    <div class="stat-card" style="border-top: 3px solid #ec4899;">
+        <div class="stat-number" style="color: #ec4899; font-size: 1.55rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
             {{ most_affected }}
         </div>
         <div class="stat-label">🚨 {{ t('stat_most_affected') }}</div>
@@ -34,15 +41,17 @@
 </div>
 
 <!-- 2. Interactive Heatmap Section -->
-<section class="section" style="margin-top: 32px;">
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; flex-wrap: wrap; gap: 12px;">
+<section class="section" style="margin-top: 36px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap; gap: 14px;">
         <div>
-            <h2 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 4px;">🔥 {{ t('heatmap_title') }}</h2>
-            <p class="muted" style="font-size: 0.9rem; margin-bottom: 0;">{{ t('heatmap_legend') }}</p>
+            <h2 style="font-size: 1.45rem; font-weight: 800; margin-bottom: 4px; color: #f8fafc; letter-spacing: -0.01em;">
+                🔥 {{ t('heatmap_title') }}
+            </h2>
+            <p class="muted" style="font-size: 0.92rem; margin-bottom: 0;">{{ t('heatmap_legend') }}</p>
         </div>
         <!-- Mode Switcher Buttons -->
         <div class="heatmap-controls" style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button type="button" id="btnModeHeatmap" class="btn btn-sm btn-primary">
+            <button type="button" id="btnModeHeatmap" class="btn btn-sm btn-primary" style="box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);">
                 {{ t('btn_toggle_heatmap') }}
             </button>
             <button type="button" id="btnModeMarkers" class="btn btn-sm btn-outline">
@@ -54,12 +63,17 @@
         </div>
     </div>
 
-    <div id="analyticsMap" style="height: 440px; width: 100%; border-radius: var(--radius-lg); border: 1.5px solid var(--border); box-shadow: var(--shadow-md); z-index: 1;"></div>
+    <div id="analyticsMap" style="height: 460px; width: 100%; border-radius: var(--radius-xl); border: 1.5px solid rgba(255, 255, 255, 0.14); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6); z-index: 1;"></div>
 </section>
 
 <!-- 3. Neighborhood Severity Ranking Table -->
-<section class="section" style="margin-top: 40px;">
-    <h2 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 16px;">📈 {{ t('ranking_title') }}</h2>
+<section class="section" style="margin-top: 44px; margin-bottom: 30px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
+        <h2 style="font-size: 1.45rem; font-weight: 800; color: #f8fafc; margin: 0; letter-spacing: -0.01em;">
+            📈 {{ t('ranking_title') }}
+        </h2>
+        <span class="muted" style="font-size: 0.88rem;">Mis à jour en temps réel</span>
+    </div>
 
     {% if neighborhood_stats %}
     <div class="table-wrap">
@@ -67,7 +81,7 @@
             <thead>
                 <tr>
                     <th>{{ t('th_neighborhood') }}</th>
-                    <th style="min-width: 140px;">Impact</th>
+                    <th style="min-width: 150px;">Impact</th>
                     <th>{{ t('th_total_outages') }}</th>
                     <th>{{ t('th_active_outages') }}</th>
                     <th>{{ t('th_restored_outages') }}</th>
@@ -79,31 +93,31 @@
                 {% for n in neighborhood_stats %}
                 <tr>
                     <td>
-                        <strong style="font-size: 1rem; color: var(--text);">{{ n.neighborhood }}</strong>
+                        <strong style="font-size: 1.02rem; color: #f8fafc;">{{ n.neighborhood }}</strong>
                     </td>
                     <td>
-                        <div style="background: #e2e8f0; border-radius: 9999px; height: 8px; width: 100%; overflow: hidden;">
-                            <div style="background: {{ n.severity_color }}; width: {{ n.percent }}%; height: 100%; border-radius: 9999px;"></div>
+                        <div style="background: rgba(255, 255, 255, 0.08); border-radius: 9999px; height: 9px; width: 100%; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.05);">
+                            <div style="background: {{ n.severity_color }}; width: {{ n.percent }}%; height: 100%; border-radius: 9999px; box-shadow: 0 0 10px {{ n.severity_color }}90;"></div>
                         </div>
                     </td>
-                    <td><strong>{{ n.total }}</strong></td>
+                    <td><strong style="color: #cbd5e1;">{{ n.total }}</strong></td>
                     <td>
                         {% if n.active > 0 %}
-                            <span style="color: #ef4444; font-weight: 700;">🔴 {{ n.active }}</span>
+                            <span style="color: #f87171; font-weight: 800;">🔴 {{ n.active }}</span>
                         {% else %}
                             <span class="muted">0</span>
                         {% endif %}
                     </td>
                     <td>
                         {% if n.restored > 0 %}
-                            <span style="color: #10b981; font-weight: 600;">🟢 {{ n.restored }}</span>
+                            <span style="color: #34d399; font-weight: 700;">🟢 {{ n.restored }}</span>
                         {% else %}
                             <span class="muted">0</span>
                         {% endif %}
                     </td>
-                    <td>{{ n.avg_duration }}h</td>
+                    <td><span style="font-family: monospace; color: #cbd5e1;">{{ n.avg_duration }}h</span></td>
                     <td>
-                        <span class="status-badge" style="background: {{ n.severity_color }}18; color: {{ n.severity_color }}; border: 1px solid {{ n.severity_color }}40;">
+                        <span class="status-badge" style="background: {{ n.severity_color }}22; color: {{ n.severity_color }}; border: 1px solid {{ n.severity_color }}50; box-shadow: 0 0 10px {{ n.severity_color }}25;">
                             ● {{ t(n.severity_key) }}
                         </span>
                     </td>
@@ -113,7 +127,9 @@
         </table>
     </div>
     {% else %}
-    <p class="muted">{{ t('no_analytics_data') }}</p>
+    <div style="padding: 36px; text-align: center; background: var(--bg-card); border-radius: var(--radius-lg); border: 1px solid var(--border-glass);">
+        <p class="muted" style="margin: 0;">{{ t('no_analytics_data') }}</p>
+    </div>
     {% endif %}
 </section>
 {% endblock %}
@@ -158,8 +174,8 @@
                     var marker = L.marker([m.lat, m.lng], { icon: icon });
                     marker.bindPopup(
                         '<div style="font-family: inherit;">' +
-                            '<strong>' + m.neighborhood + '</strong><br>' +
-                            '<span style="font-size: 0.85rem; color:#64748b;">' + m.location + '</span><br>' +
+                            '<strong style="font-size: 1rem; color: #f8fafc;">' + m.neighborhood + '</strong><br>' +
+                            '<span style="font-size: 0.85rem; color:#94a3b8;">' + m.location + '</span><br>' +
                             '<span style="font-weight:700; font-size:0.85rem; color:' + color + ';">' + m.status + '</span>' +
                         '</div>'
                     );
@@ -197,9 +213,11 @@
             [btnHeat, btnMark, btnBoth].forEach(function (b) {
                 b.classList.remove('btn-primary');
                 b.classList.add('btn-outline');
+                b.style.boxShadow = 'none';
             });
             activeBtn.classList.remove('btn-outline');
             activeBtn.classList.add('btn-primary');
+            activeBtn.style.boxShadow = '0 4px 14px rgba(37, 99, 235, 0.35)';
         }
 
         btnHeat.addEventListener('click', function () {

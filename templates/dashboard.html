@@ -2,44 +2,70 @@
 {% block title %}{{ t('nav_dashboard') }} — {{ t('app_name') }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>👋 {{ t('greeting_hello') }}, {{ session.get('user_name', 'Utilisateur') }}</h1>
-    <p class="muted">📍 {{ t('neighborhood_label') }}: <strong>{{ session.get('user_neighborhood', '—') }}</strong></p>
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+            <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #2563eb, #06b6d4); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; box-shadow: 0 0 16px rgba(37, 99, 235, 0.4);">
+                👤
+            </div>
+            <div>
+                <h1 style="margin-bottom: 0;">{{ t('greeting_hello') }}, {{ session.get('user_name', 'Citoyen') }}</h1>
+            </div>
+        </div>
+        <p class="muted" style="display: flex; align-items: center; gap: 8px;">
+            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: rgba(37, 99, 235, 0.14); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 999px; color: #38bdf8; font-weight: 700; font-size: 0.85rem;">
+                📍 {{ t('neighborhood_label') }} : {{ session.get('user_neighborhood', '—') }}
+            </span>
+            <span style="color: #64748b;">•</span>
+            <span style="color: #94a3b8; font-size: 0.88rem;">Alertes quartier actives</span>
+        </p>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <a href="{{ url_for('outages.report') }}" class="btn btn-primary">⚡ {{ t('btn_report_outage') }}</a>
+    </div>
 </div>
 
 <div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-number">{{ active }}</div>
+    <div class="stat-card" style="border-top: 3px solid #38bdf8;">
+        <div class="stat-number" style="color: #38bdf8;">{{ active }}</div>
         <div class="stat-label">⚡ {{ t('stat_active_outages') }}</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-number">{{ my_reports }}</div>
+    <div class="stat-card" style="border-top: 3px solid #a855f7;">
+        <div class="stat-number" style="color: #c084fc;">{{ my_reports }}</div>
         <div class="stat-label">📋 {{ t('stat_my_reports') }}</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-number">{{ verified }}</div>
+    <div class="stat-card" style="border-top: 3px solid #ef4444;">
+        <div class="stat-number" style="color: #f87171;">{{ verified }}</div>
         <div class="stat-label">🔴 {{ t('stat_verified') }}</div>
     </div>
-    <div class="stat-card">
-        <div class="stat-number">{{ restored }}</div>
+    <div class="stat-card" style="border-top: 3px solid #10b981;">
+        <div class="stat-number" style="color: #34d399;">{{ restored }}</div>
         <div class="stat-label">🟢 {{ t('stat_restored') }}</div>
     </div>
 </div>
 
 <div class="section-actions">
-    <a href="{{ url_for('report') }}" class="btn btn-primary">⚠️ {{ t('btn_report_outage') }}</a>
-    <a href="{{ url_for('outages') }}" class="btn btn-outline">📍 {{ t('btn_all_outages') }}</a>
-    <a href="{{ url_for('my_reports') }}" class="btn btn-outline">📁 {{ t('nav_my_reports') }}</a>
+    <a href="{{ url_for('outages.outages') }}" class="btn btn-outline">📍 {{ t('btn_all_outages') }}</a>
+    <a href="{{ url_for('outages.my_reports') }}" class="btn btn-outline">📁 {{ t('nav_my_reports') }}</a>
+    <a href="{{ url_for('outages.analytics') }}" class="btn btn-outline">📊 {{ t('nav_analytics') }}</a>
+    <a href="{{ url_for('ai.ai_page') }}" class="btn btn-outline">🤖 {{ t('nav_ai') }}</a>
 </div>
 
 <section class="section">
-    <h2 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 16px;">{{ t('recent_active_outages') }}</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+        <h2 style="font-size: 1.45rem; font-weight: 800; color: #f8fafc; margin-bottom: 0;">⚡ {{ t('recent_active_outages') }}</h2>
+        <a href="{{ url_for('outages.outages') }}" style="font-size: 0.9rem; font-weight: 700; color: #38bdf8;">Voir tout →</a>
+    </div>
+
     {% if recent %}
         <div class="outage-list">
             {% for o in recent %}
-            <div class="outage-card">
+            <div class="outage-card" style="border-left-color: {% if o.status == 'VERIFIED' %}#ef4444{% elif o.status == 'PENDING' %}#f59e0b{% elif o.status == 'RESTORED' %}#10b981{% else %}#64748b{% endif %};">
                 <div class="outage-header">
-                    <strong>{{ o.neighborhood | upper }}</strong>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.15rem;">📍</span>
+                        <strong>{{ o.neighborhood | upper }}</strong>
+                    </div>
                     <span class="status-badge status-{{ o.status | lower }}">
                         {% if o.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
                         {% elif o.status == 'PENDING' %}🟡 {{ t('status_pending') }}
@@ -47,7 +73,9 @@
                         {% else %}{{ o.status }}{% endif %}
                     </span>
                 </div>
-                <p style="font-size: 0.95rem; margin-bottom: 4px;"><strong>{{ t('th_location') }}:</strong> {{ o.location }}</p>
+                <p style="font-size: 0.98rem; margin-bottom: 6px; color: #f1f5f9;">
+                    <span style="color: #94a3b8; font-weight: 600;">{{ t('th_location') }} :</span> {{ o.location }}
+                </p>
                 <p class="outage-meta">
                     <span>🕒 {{ t('reported_on') }}: {{ o.start_time }}</span>
                     {% if o.estimated_restore %}
@@ -55,12 +83,19 @@
                     {% endif %}
                     <span>· 👥 {{ t('confirmations_count') }}: {{ o.conf_count }}</span>
                 </p>
-                <a href="{{ url_for('outage_details', outage_id=o.id) }}" class="btn btn-sm btn-outline">{{ t('btn_view_details') }} →</a>
+                <div>
+                    <a href="{{ url_for('outages.outage_details', outage_id=o.id) }}" class="btn btn-sm btn-outline">{{ t('btn_view_details') }} →</a>
+                </div>
             </div>
             {% endfor %}
         </div>
     {% else %}
-        <p class="muted">{{ t('no_active_outages') }}</p>
+        <div class="detail-card" style="text-align: center; padding: 48px 24px;">
+            <div style="font-size: 2.5rem; margin-bottom: 12px;">🎉</div>
+            <h3 style="font-size: 1.25rem; font-weight: 800; color: #f8fafc; margin-bottom: 8px;">{{ t('no_active_outages') }}</h3>
+            <p class="muted" style="max-width: 440px; margin: 0 auto 20px;">Aucune coupure de courant n'est actuellement signalée dans votre secteur.</p>
+            <a href="{{ url_for('outages.report') }}" class="btn btn-primary">⚡ Signaler une coupure</a>
+        </div>
     {% endif %}
 </section>
 {% endblock %}

@@ -205,16 +205,16 @@ function initOutageMap(elementId) {
                 var marker = L.marker([m.lat, m.lng], { icon: icon }).addTo(map);
                 marker.bindPopup(
                     '<div style="font-family: inherit;">' +
-                        '<div style="font-size:1rem; font-weight:800; color:#0f172a; margin-bottom:4px;">' +
+                        '<div style="font-size:1rem; font-weight:800; color:#f8fafc; margin-bottom:4px;">' +
                             m.neighborhood +
                         '</div>' +
-                        '<div style="color:#64748b; font-size:0.85rem; margin-bottom:8px;">' +
+                        '<div style="color:#94a3b8; font-size:0.85rem; margin-bottom:8px;">' +
                             m.location +
                         '</div>' +
                         '<div style="font-weight:700; font-size:0.85rem; margin-bottom:8px;">' +
                             label +
                         '</div>' +
-                        '<a href="/outage/' + m.id + '" style="color:#2563eb; font-weight:700; text-decoration:none; font-size:0.85rem;">' +
+                        '<a href="/outage/' + m.id + '" style="color:#38bdf8; font-weight:700; text-decoration:none; font-size:0.85rem;">' +
                             t_js("details") +
                         '</a>' +
                     '</div>'

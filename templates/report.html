@@ -4,19 +4,26 @@
 {% block content %}
 <div class="form-page">
     <div class="form-card form-card-wide">
-        <h1>⚠️ {{ t('report_title') }}</h1>
-        <p class="muted">{{ t('report_subtitle') | safe }}</p>
+        <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 8px;">
+            <div style="width: 48px; height: 48px; border-radius: var(--radius-md); background: rgba(239, 68, 68, 0.16); border: 1px solid rgba(239, 68, 68, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; box-shadow: 0 0 16px rgba(239, 68, 68, 0.25);">
+                ⚠️
+            </div>
+            <div>
+                <h1 style="margin: 0; font-size: 1.85rem; font-weight: 800; letter-spacing: -0.02em;">{{ t('report_title') }}</h1>
+                <p class="muted" style="margin: 2px 0 0; font-size: 0.95rem;">{{ t('report_subtitle') | safe }}</p>
+            </div>
+        </div>
 
         <!-- Dynamic / Server-side Duplicate Alert Container -->
         <div id="duplicateAlertBox"
-             style="{% if not existing_duplicate %}display: none;{% endif %} margin-top: 20px; padding: 18px; border-radius: var(--radius-md); background: rgba(245, 158, 11, 0.12); border: 1.5px solid rgba(245, 158, 11, 0.5);">
+             style="{% if not existing_duplicate %}display: none;{% endif %} margin-top: 22px; padding: 18px 20px; border-radius: var(--radius-lg); background: rgba(245, 158, 11, 0.12); border: 1.5px solid rgba(245, 158, 11, 0.45); box-shadow: 0 0 25px rgba(245, 158, 11, 0.15);">
             <div style="display: flex; align-items: flex-start; gap: 14px;">
                 <span style="font-size: 1.8rem; line-height: 1;">⚠️</span>
                 <div style="flex: 1;">
-                    <strong style="color: #b45309; font-size: 1.05rem;" id="duplicateAlertTitle">
+                    <strong style="color: #fbbf24; font-size: 1.05rem;" id="duplicateAlertTitle">
                         {{ t('duplicate_alert_title') }}
                     </strong>
-                    <p style="margin: 6px 0 12px; font-size: 0.92rem; color: #78350f; line-height: 1.45;" id="duplicateAlertDesc">
+                    <p style="margin: 6px 0 14px; font-size: 0.92rem; color: #fde68a; line-height: 1.5;" id="duplicateAlertDesc">
                         {% if existing_duplicate %}
                             {{ t('duplicate_alert_desc', neighborhood=existing_duplicate.neighborhood, location=existing_duplicate.location, count=existing_duplicate.conf_count) }}
                         {% endif %}
@@ -24,10 +31,10 @@
                     <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                         <a id="duplicateViewBtn"
                            href="{% if existing_duplicate %}{{ url_for('outage_details', outage_id=existing_duplicate.id) }}{% else %}#{% endif %}"
-                           class="btn btn-sm btn-primary">
+                           class="btn btn-sm btn-primary" style="box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);">
                             👉 {{ t('btn_confirm_existing') }}
                         </a>
-                        <span style="font-size: 0.85rem; color: #92400e; font-weight: 500;">
+                        <span style="font-size: 0.85rem; color: #fcd34d; font-weight: 500;">
                             {{ t('or_continue_reporting') }}
                         </span>
                     </div>
@@ -35,7 +42,7 @@
             </div>
         </div>
 
-        <form method="POST" action="{{ url_for('report') }}" id="reportForm" novalidate style="margin-top: 24px;">
+        <form method="POST" action="{{ url_for('report') }}" id="reportForm" novalidate style="margin-top: 26px;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" id="latitude" name="latitude" value="{{ form_data.latitude if form_data else '' }}">
             <input type="hidden" id="longitude" name="longitude" value="{{ form_data.longitude if form_data else '' }}">
@@ -70,8 +77,8 @@
             </div>
 
             <!-- Distinct Outage Checkbox (revealed when a duplicate exists in the area) -->
-            <div id="distinctWrap" class="form-group" style="{% if not existing_duplicate %}display: none;{% endif %} background: #f8fafc; padding: 12px 16px; border-radius: var(--radius-sm); border: 1px dashed var(--border);">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.92rem; font-weight: 600; color: var(--text);">
+            <div id="distinctWrap" class="form-group" style="{% if not existing_duplicate %}display: none;{% endif %} background: rgba(15, 23, 42, 0.8); padding: 14px 18px; border-radius: var(--radius-md); border: 1px dashed rgba(255, 255, 255, 0.2);">
+                <label style="display: flex; align-items: center; gap: 12px; cursor: pointer; font-size: 0.94rem; font-weight: 600; color: #f8fafc; margin: 0;">
                     <input type="checkbox" id="is_distinct" name="is_distinct" value="1" style="width: auto; cursor: pointer;">
                     <span>🛡️ {{ t('label_distinct_outage') }}</span>
                 </label>
@@ -85,16 +92,16 @@
             </div>
 
             <!-- GPS & Interactive Pinpoint Mini-Map -->
-            <div class="form-group" style="margin-top: 6px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 8px;">
-                    <label for="reportMap" style="margin-bottom: 0; font-weight: 700;">🗺️ {{ t('label_pinpoint_map') }}</label>
-                    <button type="button" id="btnGeo" class="btn btn-sm btn-outline" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; padding: 4px 10px;">
+            <div class="form-group" style="margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                    <label for="reportMap" style="margin-bottom: 0; font-weight: 700; color: #f8fafc;">🗺️ {{ t('label_pinpoint_map') }}</label>
+                    <button type="button" id="btnGeo" class="btn btn-sm btn-outline" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; padding: 5px 12px; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
                         {{ t('btn_use_my_location') }}
                     </button>
                 </div>
-                <p class="muted" style="font-size: 0.85rem; margin-bottom: 8px;">{{ t('hint_pinpoint_map') }}</p>
-                <div id="reportMap" style="height: 250px; width: 100%; border-radius: var(--radius-md); border: 1.5px solid var(--border); box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); z-index: 1;"></div>
-                <div id="geoStatus" style="font-size: 0.83rem; margin-top: 6px; display: none; font-weight: 600;"></div>
+                <p class="muted" style="font-size: 0.86rem; margin-bottom: 10px;">{{ t('hint_pinpoint_map') }}</p>
+                <div id="reportMap" style="height: 260px; width: 100%; border-radius: var(--radius-lg); border: 1.5px solid rgba(255, 255, 255, 0.14); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); z-index: 1;"></div>
+                <div id="geoStatus" style="font-size: 0.85rem; margin-top: 8px; display: none; font-weight: 700;"></div>
             </div>
 
             <div class="form-group">
@@ -109,7 +116,9 @@
                        value="{{ form_data.start_time if form_data else '' }}">
             </div>
 
-            <button type="submit" class="btn btn-primary btn-block">🚀 {{ t('btn_submit_report') }}</button>
+            <button type="submit" class="btn btn-primary btn-block" style="padding: 14px; font-size: 1.05rem; box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);">
+                🚀 {{ t('btn_submit_report') }}
+            </button>
         </form>
     </div>
 </div>
@@ -239,7 +248,7 @@
 
         var pinIcon = L.divIcon({
             className: 'custom-marker-wrap',
-            html: '<div class="marker-pulse pulse-red"></div><div class="marker-core core-red" style="width: 18px; height: 18px; line-height: 18px; font-size: 10px;">📍</div>',
+            html: '<div class="marker-pulse pulse-red"></div><div class="marker-core core-red" style="width: 20px; height: 20px; line-height: 20px; font-size: 11px;">📍</div>',
             iconSize: [28, 28],
             iconAnchor: [14, 14]
         });
@@ -270,7 +279,7 @@
         reportMap.on('click', function (e) {
             setPin(e.latlng.lat, e.latlng.lng);
             geoStatus.style.display = 'block';
-            geoStatus.style.color = '#2563eb';
+            geoStatus.style.color = '#38bdf8';
             geoStatus.textContent = '📍 Point placé : ' + e.latlng.lat.toFixed(4) + ', ' + e.latlng.lng.toFixed(4);
         });
 
@@ -279,7 +288,7 @@
             btnGeo.addEventListener('click', function () {
                 if (!navigator.geolocation) {
                     geoStatus.style.display = 'block';
-                    geoStatus.style.color = '#ef4444';
+                    geoStatus.style.color = '#f87171';
                     geoStatus.textContent = '⚠️ {{ t("msg_geo_unsupported") }}';
                     return;
                 }
@@ -299,14 +308,14 @@
                         setPin(lat, lng);
 
                         geoStatus.style.display = 'block';
-                        geoStatus.style.color = '#10b981';
+                        geoStatus.style.color = '#34d399';
                         geoStatus.textContent = '✓ {{ t("loc_detected_msg") }} (' + lat.toFixed(4) + ', ' + lng.toFixed(4) + ')';
                     },
                     function (err) {
                         btnGeo.disabled = false;
                         btnGeo.textContent = '{{ t("btn_use_my_location") }}';
                         geoStatus.style.display = 'block';
-                        geoStatus.style.color = '#ef4444';
+                        geoStatus.style.color = '#f87171';
                         geoStatus.textContent = '⚠️ {{ t("msg_geo_denied") }}';
                     },
                     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -327,7 +336,7 @@
             });
         }
 
-        // Invalidate map size after DOM render to ensure Leaflet renders all tiles cleanly
+        // Invalidate map size after DOM render
         setTimeout(function () {
             reportMap.invalidateSize();
         }, 200);

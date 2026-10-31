@@ -2,80 +2,154 @@
 {% block title %}{{ t('outage_detail_title') }}{{ outage.id }} — {{ t('app_name') }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <a href="{{ url_for('outages') }}" class="back-link">← {{ t('back_to_outages') }}</a>
-    <h1>📍 {{ outage.neighborhood | upper }}</h1>
+<div class="page-header" style="margin-bottom: 24px;">
+    <a href="{{ url_for('outages') }}" class="back-link" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: #38bdf8; margin-bottom: 12px;">
+        ← {{ t('back_to_outages') }}
+    </a>
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+        <div>
+            <span style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #38bdf8;">Incident #{{ outage.id }}</span>
+            <h1 style="margin: 2px 0 0; font-size: 2rem; font-weight: 800; letter-spacing: -0.02em;">📍 {{ outage.neighborhood | upper }}</h1>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <span class="status-badge status-{{ outage.status | lower }}">
+                {% if outage.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
+                {% elif outage.status == 'PENDING' %}🟡 {{ t('status_pending') }}
+                {% elif outage.status == 'RESTORED' %}🟢 {{ t('status_restored') }}
+                {% else %}{{ outage.status }}{% endif %}
+            </span>
+            {% if outage.conf_off >= 3 %}
+            <span class="status-badge" style="background: rgba(37, 99, 235, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); box-shadow: 0 0 12px rgba(37, 99, 235, 0.25);">
+                👥 {{ t('badge_community_verified') }} ({{ outage.conf_off }})
+            </span>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
 <div class="detail-card">
-    <div class="outage-header" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-        <span class="status-badge status-{{ outage.status | lower }}">
-            {% if outage.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
-            {% elif outage.status == 'PENDING' %}🟡 {{ t('status_pending') }}
-            {% elif outage.status == 'RESTORED' %}🟢 {{ t('status_restored') }}
-            {% else %}{{ outage.status }}{% endif %}
-        </span>
-        {% if outage.conf_off >= 3 %}
-        <span class="status-badge" style="background: rgba(37, 99, 235, 0.12); color: var(--primary); border: 1px solid rgba(37, 99, 235, 0.3);">
-            👥 {{ t('badge_community_verified') }} ({{ outage.conf_off }})
-        </span>
-        {% endif %}
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--border-glass);">
+        <div style="width: 44px; height: 44px; border-radius: var(--radius-md); background: rgba(37, 99, 235, 0.16); border: 1px solid rgba(37, 99, 235, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
+            ⚡
+        </div>
+        <div>
+            <h2 style="font-size: 1.25rem; font-weight: 800; color: #f8fafc; margin: 0;">Fiche Détaillée de la Coupure</h2>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin: 0;">Données certifiées et signalements vérifiés en direct</p>
+        </div>
     </div>
 
     <table class="detail-table">
-        <tr><th>📌 {{ t('th_location') }}</th><td><strong>{{ outage.location }}</strong></td></tr>
-        <tr><th>📝 {{ t('th_description') }}</th><td>{{ outage.description or '—' }}</td></tr>
-        <tr><th>👤 {{ t('th_reported_by') }}</th><td>{{ outage.full_name }}</td></tr>
-        <tr><th>🕒 {{ t('th_time_off') }}</th><td>{{ outage.start_time }}</td></tr>
-        <tr>
-            <th>⏳ {{ t('th_est_restore') }}</th>
-            <td>
-                {% if outage.estimated_restore %}
-                    <strong>{{ outage.estimated_restore }}</strong>
-                    <br><span class="estimate-note">⚠️ {{ t('estimate_disclaimer') }}</span>
-                {% else %}
-                    <span class="muted">{{ t('no_estimate_available') }}</span>
-                {% endif %}
-            </td>
-        </tr>
-        <tr><th>🏷️ {{ t('th_status') }}</th><td>{{ outage.status }}</td></tr>
-        {% if outage.latitude and outage.longitude %}
-        <tr>
-            <th>📍 Coordonnées GPS</th>
-            <td>
-                <code>{{ outage.latitude }}, {{ outage.longitude }}</code>
-                <a href="https://www.google.com/maps?q={{ outage.latitude }},{{ outage.longitude }}" target="_blank" rel="noopener noreferrer" style="margin-left: 8px; font-size: 0.85rem;" class="btn btn-sm btn-outline">
-                    🗺️ Maps ↗
-                </a>
-            </td>
-        </tr>
-        {% endif %}
-        <tr><th>🔴 {{ t('th_conf_off') }}</th><td><strong>{{ outage.conf_off }}</strong></td></tr>
-        <tr><th>🟢 {{ t('th_conf_restored') }}</th><td><strong>{{ outage.conf_restored }}</strong></td></tr>
-        <tr><th>📅 {{ t('th_created') }}</th><td>{{ outage.created_at }}</td></tr>
+        <tbody>
+            <tr>
+                <th>📌 {{ t('th_location') }}</th>
+                <td><strong style="color: #f8fafc; font-size: 1.05rem;">{{ outage.location }}</strong></td>
+            </tr>
+            <tr>
+                <th>📝 {{ t('th_description') }}</th>
+                <td style="color: #cbd5e1;">{{ outage.description or '—' }}</td>
+            </tr>
+            <tr>
+                <th>👤 {{ t('th_reported_by') }}</th>
+                <td style="color: #94a3b8;">{{ outage.full_name }}</td>
+            </tr>
+            <tr>
+                <th>🕒 {{ t('th_time_off') }}</th>
+                <td><span style="font-family: monospace; font-size: 0.95rem; color: #e2e8f0;">{{ outage.start_time }}</span></td>
+            </tr>
+            <tr>
+                <th>⏳ {{ t('th_est_restore') }}</th>
+                <td>
+                    {% if outage.estimated_restore %}
+                        <strong style="color: #fbbf24; font-size: 1rem;">{{ outage.estimated_restore }}</strong>
+                        <div class="estimate-note" style="margin-top: 6px;">⚠️ {{ t('estimate_disclaimer') }}</div>
+                    {% else %}
+                        <span class="muted">{{ t('no_estimate_available') }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th>🏷️ {{ t('th_status') }}</th>
+                <td>
+                    <span class="status-badge status-{{ outage.status | lower }}">
+                        {% if outage.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
+                        {% elif outage.status == 'PENDING' %}🟡 {{ t('status_pending') }}
+                        {% elif outage.status == 'RESTORED' %}🟢 {{ t('status_restored') }}
+                        {% else %}{{ outage.status }}{% endif %}
+                    </span>
+                </td>
+            </tr>
+            {% if outage.latitude and outage.longitude %}
+            <tr>
+                <th>📍 Coordonnées GPS</th>
+                <td>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <code style="background: rgba(255, 255, 255, 0.07); padding: 4px 10px; border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.12); color: #38bdf8;">
+                            {{ outage.latitude }}, {{ outage.longitude }}
+                        </code>
+                        <a href="https://www.google.com/maps?q={{ outage.latitude }},{{ outage.longitude }}" target="_blank" rel="noopener noreferrer"
+                           class="btn btn-sm btn-outline" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
+                            🗺️ Google Maps ↗
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endif %}
+            <tr>
+                <th>🔴 {{ t('th_conf_off') }}</th>
+                <td>
+                    <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #f87171;">
+                        {{ outage.conf_off }} citoyen(s)
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <th>🟢 {{ t('th_conf_restored') }}</th>
+                <td>
+                    <span style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #4ade80;">
+                        {{ outage.conf_restored }} citoyen(s)
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <th>📅 {{ t('th_created') }}</th>
+                <td style="color: var(--text-muted); font-size: 0.9rem;">{{ outage.created_at }}</td>
+            </tr>
+        </tbody>
     </table>
 
     {% if session.get('user_id') and outage.status in ['PENDING', 'VERIFIED'] %}
         {% if not user_confirmed %}
         <div class="confirm-box">
-            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 6px;">👥 {{ t('confirm_box_title') }}</h3>
-            <p class="muted">{{ t('confirm_box_subtitle') }}</p>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                <span style="font-size: 1.3rem;">👥</span>
+                <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0; color: #f8fafc;">{{ t('confirm_box_title') }}</h3>
+            </div>
+            <p class="muted" style="margin-bottom: 16px; font-size: 0.92rem;">{{ t('confirm_box_subtitle') }}</p>
             <form method="POST" action="{{ url_for('confirm_outage', outage_id=outage.id) }}"
                   class="confirm-forms" onsubmit="return confirmAction(this);">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" name="confirmation" value="STILL_OFF"
-                        class="btn btn-danger">🔴 {{ t('btn_confirm_off') }}</button>
+                        class="btn btn-danger" style="box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);">
+                    🔴 {{ t('btn_confirm_off') }}
+                </button>
                 <button type="submit" name="confirmation" value="RESTORED"
-                        class="btn btn-success">🟢 {{ t('btn_confirm_restored') }}</button>
+                        class="btn btn-success" style="box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);">
+                    🟢 {{ t('btn_confirm_restored') }}
+                </button>
             </form>
         </div>
         {% else %}
-        <p class="info-box">✓ {{ t('already_confirmed_msg') }}</p>
+        <div class="info-box" style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.2rem;">✓</span>
+            <span>{{ t('already_confirmed_msg') }}</span>
+        </div>
         {% endif %}
     {% elif not session.get('user_id') %}
-        <p class="muted" style="margin-top: 20px;">
-            <a href="{{ url_for('login') }}"><strong>{{ t('nav_login') }}</strong></a> {{ t('login_to_confirm') }}
-        </p>
+        <div style="margin-top: 24px; padding: 18px 22px; background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); text-align: center;">
+            <p class="muted" style="margin: 0; font-size: 0.95rem;">
+                <a href="{{ url_for('login') }}" style="color: #38bdf8; font-weight: 700;">{{ t('nav_login') }}</a> {{ t('login_to_confirm') }}
+            </p>
+        </div>
     {% endif %}
 </div>
 {% endblock %}

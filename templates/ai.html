@@ -2,24 +2,47 @@
 {% block title %}{{ t('ai_title') }} — {{ t('app_name') }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>🤖 {{ t('ai_title') }}</h1>
-    <p class="muted">{{ t('ai_subtitle') }}</p>
+<div class="page-header" style="margin-bottom: 28px;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 52px; height: 52px; border-radius: var(--radius-md); background: rgba(6, 182, 212, 0.16); border: 1px solid rgba(6, 182, 212, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; box-shadow: 0 0 18px rgba(6, 182, 212, 0.25);">
+            🤖
+        </div>
+        <div>
+            <h1 style="margin: 0; font-size: 2.1rem; font-weight: 800; letter-spacing: -0.03em;">{{ t('ai_title') }}</h1>
+            <p class="muted" style="margin: 2px 0 0; font-size: 1.02rem;">{{ t('ai_subtitle') }}</p>
+        </div>
+    </div>
 </div>
 
-<div class="ai-box">
+<div class="ai-box" style="margin: 0 auto;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border-glass);">
+        <span style="font-size: 0.85rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #38bdf8;">
+            ⚡ Intelligence Synthétique Douala
+        </span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: #34d399; font-weight: 700;">
+            <span class="pulse-dot" style="background: #10b981; box-shadow: 0 0 10px #10b981; width: 8px; height: 8px;"></span> En ligne
+        </span>
+    </div>
+
     <form method="POST" action="{{ url_for('ai_page') }}" id="aiForm">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
-            <label for="question">💬 {{ t('label_your_question') }}</label>
+            <label for="question" style="font-size: 0.98rem; font-weight: 700; color: #f8fafc;">
+                💬 {{ t('label_your_question') }}
+            </label>
             <textarea id="question" name="question" rows="3" required
-                      placeholder="{{ t('placeholder_question') }}">{{ question }}</textarea>
+                      placeholder="{{ t('placeholder_question') }}"
+                      style="font-size: 1rem; line-height: 1.55; resize: vertical;">{{ question }}</textarea>
         </div>
-        <button type="submit" class="btn btn-primary">⚡ {{ t('btn_ask') }}</button>
+        <button type="submit" class="btn btn-primary" style="padding: 12px 24px; font-size: 1rem; box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4);">
+            ⚡ {{ t('btn_ask') }}
+        </button>
     </form>
 
-    <div class="ai-suggestions">
-        <p class="muted" style="margin-bottom: 8px; font-weight: 600;">💡 {{ t('try_suggestions') }}</p>
+    <div class="ai-suggestions" style="margin-top: 26px;">
+        <p class="muted" style="margin-bottom: 10px; font-size: 0.9rem; font-weight: 700; color: #cbd5e1;">
+            💡 {{ t('try_suggestions') }}
+        </p>
         <button type="button" class="chip" data-q="{{ t('chip_1') }}">📍 {{ t('chip_1') }}</button>
         <button type="button" class="chip" data-q="{{ t('chip_2') }}">⚡ {{ t('chip_2') }}</button>
         <button type="button" class="chip" data-q="{{ t('chip_3') }}">⏳ {{ t('chip_3') }}</button>
@@ -27,9 +50,16 @@
     </div>
 
     {% if answer %}
-    <div class="ai-answer">
-        <h3>✨ {{ t('ai_answer_title') }}</h3>
-        <div class="ai-answer-body">{{ answer | replace('\n', '<br>') | safe }}</div>
+    <div class="ai-answer" style="margin-top: 32px;">
+        <h3 style="margin-bottom: 14px; font-size: 1.15rem; font-weight: 800; color: #6ee7b7; display: flex; align-items: center; gap: 8px;">
+            <span>✨</span> {{ t('ai_answer_title') }}
+        </h3>
+        <div class="ai-answer-body" style="font-size: 1rem; line-height: 1.7; color: #f8fafc;">
+            {{ answer | replace('\n', '<br>') | safe }}
+        </div>
+        <div style="margin-top: 18px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.8rem; color: #94a3b8; display: flex; align-items: center; gap: 6px;">
+            <span>🛡️ Données calculées en temps réel sur la base des signalements enregistrés dans Douala.</span>
+        </div>
     </div>
     {% endif %}
 </div>
