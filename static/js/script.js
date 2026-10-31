@@ -57,6 +57,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Password visibility toggles
     setupPasswordToggles();
+
+    // In-app & Web Push Notification Center
+    setupNotifications();
 });
 
 function setupPasswordToggles() {
@@ -222,5 +225,224 @@ function initOutageMap(elementId) {
             // Silent fail – map still shows base tiles
         });
 }
+
+// ===========================================================================
+// In-App & Web Push Notification Center
+// ===========================================================================
+
+function setupNotifications() {
+    var bellContainer = document.getElementById("notifBellContainer");
+    if (!bellContainer) return; // User not logged in
+
+    var bellBtn = document.getElementById("notifBellBtn");
+    var notifBadge = document.getElementById("notifBadge");
+    var notifDropdown = document.getElementById("notifDropdown");
+    var notifList = document.getElementById("notifList");
+    var notifMarkAllReadBtn = document.getElementById("notifMarkAllReadBtn");
+    var notifBrowserPrompt = document.getElementById("notifBrowserPrompt");
+    var btnEnablePush = document.getElementById("btnEnablePush");
+
+    // 1. Service Worker registration
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/static/sw.js").catch(function () {});
+    }
+
+    // 2. Browser Push Permission Check
+    if ("Notification" in window) {
+        if (Notification.permission === "granted") {
+            if (btnEnablePush) {
+                btnEnablePush.textContent = getLang() === "fr" ? "Activées ✓" : "Active ✓";
+                btnEnablePush.disabled = true;
+                btnEnablePush.style.background = "#10b981";
+            }
+        } else if (Notification.permission === "denied") {
+            if (notifBrowserPrompt) notifBrowserPrompt.style.display = "none";
+        }
+
+        if (btnEnablePush) {
+            btnEnablePush.addEventListener("click", function () {
+                Notification.requestPermission().then(function (perm) {
+                    if (perm === "granted") {
+                        btnEnablePush.textContent = getLang() === "fr" ? "Activées ✓" : "Active ✓";
+                        btnEnablePush.disabled = true;
+                        btnEnablePush.style.background = "#10b981";
+                        triggerWebPush({
+                            title: getLang() === "fr" ? "⚡ Notifications activées" : "⚡ Notifications Enabled",
+                            message: getLang() === "fr" ? "Vous recevrez désormais des alertes dès qu'une coupure survient dans votre quartier !" : "You will now receive alerts whenever an outage occurs in your neighborhood!"
+                        });
+                    }
+                });
+            });
+        }
+    } else if (notifBrowserPrompt) {
+        notifBrowserPrompt.style.display = "none";
+    }
+
+    // 3. Audio Chime via Web Audio API
+    function playNotificationChime() {
+        try {
+            var AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            var ctx = new AudioCtx();
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+            osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12); // A5
+            gain.gain.setValueAtTime(0.12, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.35);
+        } catch (e) {}
+    }
+
+    // 4. Trigger Web Push / Desktop Notification
+    function triggerWebPush(notif) {
+        if (!("Notification" in window) || Notification.permission !== "granted") {
+            return;
+        }
+
+        var title = notif.title || "Douala Power Alert";
+        var options = {
+            body: notif.message,
+            icon: "/static/img/icon-bolt.svg",
+            badge: "/static/img/icon-bolt.svg",
+            data: { url: notif.outage_id ? "/outage/" + notif.outage_id : "/outages" }
+        };
+
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(function (reg) {
+                reg.showNotification(title, options);
+            });
+        } else {
+            var n = new Notification(title, options);
+            n.onclick = function () {
+                window.focus();
+                if (notif.outage_id) {
+                    window.location.href = "/outage/" + notif.outage_id;
+                }
+            };
+        }
+    }
+
+    // 5. Update Badge Count
+    function updateBadge(count) {
+        if (!notifBadge) return;
+        if (count > 0) {
+            notifBadge.textContent = count > 99 ? "99+" : count;
+            notifBadge.style.display = "flex";
+        } else {
+            notifBadge.style.display = "none";
+        }
+    }
+
+    // 6. Render Notifications List
+    function renderList(notifications) {
+        if (!notifList) return;
+        if (!notifications || notifications.length === 0) {
+            notifList.innerHTML = '<div class="notif-empty">' + (getLang() === 'fr' ? 'Aucune notification pour votre quartier.' : 'No notifications for your neighborhood.') + '</div>';
+            return;
+        }
+
+        var html = "";
+        notifications.forEach(function (n) {
+            var icon = "⚡";
+            if (n.type === "OUTAGE_VERIFIED") icon = "⚠️";
+            else if (n.type === "OUTAGE_RESTORED") icon = "💡";
+            else if (n.type === "OUTAGE_ESTIMATE") icon = "🕒";
+
+            var unreadClass = n.is_read ? "" : " unread";
+            var url = n.outage_id ? "/outage/" + n.outage_id : "/outages";
+
+            html += '<a href="' + url + '" class="notif-item' + unreadClass + '">' +
+                        '<div class="notif-item-icon">' + icon + '</div>' +
+                        '<div class="notif-item-content">' +
+                            '<div class="notif-item-title">' + n.title + '</div>' +
+                            '<div class="notif-item-msg">' + n.message + '</div>' +
+                            '<div class="notif-item-time">' + n.created_at + '</div>' +
+                        '</div>' +
+                    '</a>';
+        });
+
+        notifList.innerHTML = html;
+    }
+
+    // 7. Fetch Notifications from Server
+    function loadNotifications(isInitial) {
+        fetch("/api/notifications")
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                updateBadge(data.unread_count || 0);
+                renderList(data.notifications || []);
+
+                // Detect new notifications to fire browser alerts
+                if (data.notifications && data.notifications.length > 0) {
+                    var latest = data.notifications[0];
+                    var lastSeen = parseInt(localStorage.getItem("douala_last_notif_id") || "0", 10);
+
+                    if (!isInitial && latest.id > lastSeen && !latest.is_read) {
+                        triggerWebPush(latest);
+                        playNotificationChime();
+                    }
+                    localStorage.setItem("douala_last_notif_id", latest.id.toString());
+                }
+            })
+            .catch(function () {});
+    }
+
+    // Initial load
+    loadNotifications(true);
+
+    // Poll every 15 seconds for real-time neighborhood updates
+    setInterval(function () {
+        loadNotifications(false);
+    }, 15000);
+
+    // 8. Toggle Dropdown on Bell Click
+    if (bellBtn && notifDropdown) {
+        bellBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var isHidden = notifDropdown.style.display === "none";
+            notifDropdown.style.display = isHidden ? "block" : "none";
+            if (isHidden) {
+                loadNotifications(false);
+            }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener("click", function (e) {
+            if (!bellContainer.contains(e.target)) {
+                notifDropdown.style.display = "none";
+            }
+        });
+    }
+
+    // 9. Mark All as Read
+    if (notifMarkAllReadBtn) {
+        notifMarkAllReadBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            var token = meta ? meta.getAttribute("content") : "";
+
+            fetch("/api/notifications/mark-read", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": token
+                },
+                body: JSON.stringify({})
+            })
+            .then(function (res) { return res.json(); })
+            .then(function () {
+                updateBadge(0);
+                loadNotifications(false);
+            })
+            .catch(function () {});
+        });
+    }
+}
+
 
 

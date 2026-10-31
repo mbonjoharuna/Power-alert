@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}{{ t('app_name') }}{% endblock %}</title>
     <!-- Google Fonts: Plus Jakarta Sans -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,6 +57,28 @@
                         <a href="{{ url_for('admin_login') }}" class="btn-nav-outline">{{ t('nav_admin') }}</a>
                     {% endif %}
                 </nav>
+
+                {% if session.get('user_id') %}
+                <div class="notif-bell-container" id="notifBellContainer">
+                    <button class="notif-bell-btn" id="notifBellBtn" type="button" aria-label="Notifications" title="{{ t('notif_title') }}">
+                        <span class="bell-icon">🔔</span>
+                        <span class="notif-badge" id="notifBadge" style="display: none;">0</span>
+                    </button>
+                    <div class="notif-dropdown" id="notifDropdown" style="display: none;">
+                        <div class="notif-dropdown-header">
+                            <span class="notif-dropdown-title">🔔 {{ t('notif_title') }}</span>
+                            <button type="button" class="notif-mark-read-btn" id="notifMarkAllReadBtn">{{ t('notif_mark_all_read') }}</button>
+                        </div>
+                        <div class="notif-browser-prompt" id="notifBrowserPrompt">
+                            <span class="notif-prompt-text">{{ t('notif_browser_permission') }}</span>
+                            <button type="button" class="btn-enable-push" id="btnEnablePush">{{ t('notif_enable_push') }}</button>
+                        </div>
+                        <div class="notif-list" id="notifList">
+                            <div class="notif-empty">{{ t('notif_loading') }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
 
                 <div class="lang-switcher" aria-label="Language Selector">
                     <a href="{{ url_for('set_language', lang='fr') }}"

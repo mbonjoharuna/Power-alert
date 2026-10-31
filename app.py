@@ -25,6 +25,12 @@ from database import (
     get_db, get_cursor, get_db_cursor, init_db, ensure_admin
 )
 from services.ai_service import ask_ai
+from services.notification_service import (
+    create_neighborhood_notification,
+    get_user_notifications,
+    get_unread_count,
+    mark_as_read,
+)
 from translations import get_text
 
 load_dotenv()
@@ -370,6 +376,18 @@ def report():
                        VALUES (%s, %s, %s, %s, %s, 'PENDING', %s, %s)""",
                     (session["user_id"], neighborhood, location, description, start_time, lat, lng),
                 )
+                new_outage_id = cur.lastrowid
+
+            # Instant in-app notification to all residents of this neighborhood
+            create_neighborhood_notification(
+                neighborhood=neighborhood,
+                outage_id=new_outage_id,
+                title=get_text("notif_new_outage_title", lang=lang),
+                message=get_text("notif_new_outage_msg", lang=lang, neighborhood=neighborhood, location=location),
+                notif_type="OUTAGE_NEW",
+                exclude_user_id=session["user_id"]
+            )
+
             flash(get_text("msg_report_success", lang=lang), "success")
             return redirect(url_for("outages"))
         except Error:
@@ -473,7 +491,7 @@ def confirm_outage(outage_id):
         total_confs = 0
 
         with get_db_cursor(commit=True) as cur:
-            cur.execute("SELECT status FROM outages WHERE id = %s", (outage_id,))
+            cur.execute("SELECT status, neighborhood, location FROM outages WHERE id = %s", (outage_id,))
             outage = cur.fetchone()
             if not outage or outage["status"] == "REJECTED":
                 flash(get_text("msg_outage_not_found", lang=lang), "danger")
@@ -516,8 +534,22 @@ def confirm_outage(outage_id):
                     auto_restored = True
 
         if auto_verified:
+            create_neighborhood_notification(
+                neighborhood=outage["neighborhood"],
+                outage_id=outage_id,
+                title=get_text("notif_verified_title", lang=lang),
+                message=get_text("notif_verified_msg", lang=lang, neighborhood=outage["neighborhood"], location=outage["location"]),
+                notif_type="OUTAGE_VERIFIED"
+            )
             flash(get_text("msg_auto_verified_community", lang=lang, count=total_confs), "success")
         elif auto_restored:
+            create_neighborhood_notification(
+                neighborhood=outage["neighborhood"],
+                outage_id=outage_id,
+                title=get_text("notif_restored_title", lang=lang),
+                message=get_text("notif_restored_msg", lang=lang, neighborhood=outage["neighborhood"], location=outage["location"]),
+                notif_type="OUTAGE_RESTORED"
+            )
             flash(get_text("msg_auto_restored_community", lang=lang, count=total_confs), "success")
         elif confirmation == "STILL_OFF":
             flash(get_text("msg_confirm_saved_off", lang=lang), "success")
@@ -797,9 +829,19 @@ def admin_approve(outage_id):
     lang = get_current_lang()
     try:
         with get_db_cursor(commit=True) as cur:
+            cur.execute("SELECT neighborhood, location FROM outages WHERE id = %s", (outage_id,))
+            o = cur.fetchone()
             cur.execute(
                 "UPDATE outages SET status = 'VERIFIED' WHERE id = %s",
                 (outage_id,),
+            )
+        if o:
+            create_neighborhood_notification(
+                neighborhood=o["neighborhood"],
+                outage_id=outage_id,
+                title=get_text("notif_verified_title", lang=lang),
+                message=get_text("notif_verified_msg", lang=lang, neighborhood=o["neighborhood"], location=o["location"]),
+                notif_type="OUTAGE_VERIFIED"
             )
         flash(get_text("msg_admin_approved", lang=lang, id=outage_id), "success")
     except Error:
@@ -829,9 +871,19 @@ def admin_restore(outage_id):
     lang = get_current_lang()
     try:
         with get_db_cursor(commit=True) as cur:
+            cur.execute("SELECT neighborhood, location FROM outages WHERE id = %s", (outage_id,))
+            o = cur.fetchone()
             cur.execute(
                 "UPDATE outages SET status = 'RESTORED' WHERE id = %s",
                 (outage_id,),
+            )
+        if o:
+            create_neighborhood_notification(
+                neighborhood=o["neighborhood"],
+                outage_id=outage_id,
+                title=get_text("notif_restored_title", lang=lang),
+                message=get_text("notif_restored_msg", lang=lang, neighborhood=o["neighborhood"], location=o["location"]),
+                notif_type="OUTAGE_RESTORED"
             )
         flash(get_text("msg_admin_restored", lang=lang, id=outage_id), "success")
     except Error:
@@ -856,9 +908,20 @@ def admin_update(outage_id):
 
     try:
         with get_db_cursor(commit=True) as cur:
+            cur.execute("SELECT neighborhood, location FROM outages WHERE id = %s", (outage_id,))
+            o = cur.fetchone()
             cur.execute(
                 "UPDATE outages SET estimated_restore = %s WHERE id = %s",
                 (estimate, outage_id),
+            )
+        if o:
+            time_str = estimate.strftime("%d/%m/%Y à %H:%M")
+            create_neighborhood_notification(
+                neighborhood=o["neighborhood"],
+                outage_id=outage_id,
+                title=get_text("notif_estimate_title", lang=lang),
+                message=get_text("notif_estimate_msg", lang=lang, neighborhood=o["neighborhood"], location=o["location"], time=time_str),
+                notif_type="OUTAGE_ESTIMATE"
             )
         flash(get_text("msg_admin_estimate_updated", lang=lang, id=outage_id), "success")
     except Error:
@@ -1041,6 +1104,41 @@ def api_map_outages():
         return jsonify(markers)
     except Error:
         return jsonify([])
+
+
+# ---------------------------------------------------------------------------
+# Notification APIs
+# ---------------------------------------------------------------------------
+
+@app.route("/api/notifications")
+def api_get_notifications():
+    """Retrieve notifications and unread count for current logged-in user."""
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"unread_count": 0, "notifications": []})
+
+    notifications = get_user_notifications(user_id, limit=20)
+    unread_count = get_unread_count(user_id)
+    return jsonify({
+        "unread_count": unread_count,
+        "notifications": notifications
+    })
+
+
+@app.route("/api/notifications/mark-read", methods=["POST"])
+@csrf.exempt
+def api_mark_notifications_read():
+    """Mark one or all notifications as read for current user."""
+    user_id = session.get("user_id")
+    if not user_id:
+        return jsonify({"success": False, "error": "Not authenticated"}), 401
+
+    notif_id = request.form.get("notification_id") or (
+        request.json.get("notification_id") if request.is_json else None
+    )
+    success = mark_as_read(user_id, notif_id)
+    unread_count = get_unread_count(user_id)
+    return jsonify({"success": success, "unread_count": unread_count})
 
 
 # ---------------------------------------------------------------------------
