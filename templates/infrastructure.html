@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('infra_title') }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Breadcrumb & Header -->
+    <div class="mb-4">
+        <a href="{{ url_for('outages') }}" class="text-muted text-decoration-none small">
+            &larr; {{ t('nav_outages') }}
+        </a>
+        <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 gap-3">
+            <div>
+                <h1 class="h2 fw-bold text-white mb-1 d-flex align-items-center gap-2">
+                    <span class="fs-1">🏥</span> {{ t('infra_title') }}
+                </h1>
+                <p class="text-muted mb-0">
+                    {{ t('infra_subtitle') }}
+                </p>
+            </div>
+            {% if session.get('admin_id') %}
+            <div>
+                <a href="{{ url_for('admin.admin_infrastructure') }}" class="btn btn-outline-warning btn-sm d-flex align-items-center gap-2">
+                    <span>⚙️</span> {{ t('btn_admin_infra') }}
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Live Telemetry KPI Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card bg-dark-glass border-glass p-3 h-100">
+                <span class="text-muted small text-uppercase fw-semibold">{{ t('infra_kpi_total') }}</span>
+                <div class="d-flex align-items-baseline gap-2 mt-2">
+                    <span class="fs-3 fw-bold text-white">{{ kpis.total }}</span>
+                    <span class="small text-muted">sites Douala</span>
+                </div>
+                <div class="small text-info mt-1">Hôpitaux, Eau & Dialyse</div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <div class="card bg-dark-glass border-glass p-3 h-100">
+                <span class="text-muted small text-uppercase fw-semibold">{{ t('infra_kpi_grid') }}</span>
+                <div class="d-flex align-items-baseline gap-2 mt-2">
+                    <span class="fs-3 fw-bold text-success">{{ kpis.on_grid }}</span>
+                    <span class="small text-muted">/ {{ kpis.total }}</span>
+                </div>
+                <div class="progress mt-2" style="height: 4px; background: rgba(255,255,255,0.08);">
+                    <div class="progress-bar bg-success" style="width: {{ kpis.grid_percent }}%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <div class="card bg-dark-glass border-glass p-3 h-100">
+                <span class="text-muted small text-uppercase fw-semibold">{{ t('infra_kpi_generator') }}</span>
+                <div class="d-flex align-items-baseline gap-2 mt-2">
+                    <span class="fs-3 fw-bold text-warning">{{ kpis.backup_generator }}</span>
+                    <span class="small text-muted">en urgence</span>
+                </div>
+                <div class="small text-warning mt-1">Alimentation secours active</div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <div class="card bg-dark-glass border-glass p-3 h-100">
+                <span class="text-muted small text-uppercase fw-semibold">{{ t('infra_kpi_blackout') }}</span>
+                <div class="d-flex align-items-baseline gap-2 mt-2">
+                    <span class="fs-3 fw-bold text-danger">{{ kpis.critical_blackout }}</span>
+                    <span class="small text-muted">sites</span>
+                </div>
+                <div class="small text-danger mt-1">{% if kpis.critical_blackout > 0 %}🚨 Alerte critique requise{% else %}Aucune coupure totale{% endif %}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Section -->
+    <div class="card bg-dark-glass border-glass overflow-hidden mb-4 shadow-lg">
+        <div class="card-header bg-transparent border-glass p-3 d-flex justify-content-between align-items-center">
+            <span class="fw-semibold text-white d-flex align-items-center gap-2">
+                <span>🗺️</span> Carte interactive des établissements de santé et stations Camwater
+            </span>
+            <span class="badge bg-secondary-glass">Coordonnées GPS Douala</span>
+        </div>
+        <div id="infraMap" style="height: 380px; width: 100%;" class="bg-darker"></div>
+    </div>
+
+    <!-- Filters Bar -->
+    <div class="card bg-dark-glass border-glass p-3 mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ url_for('infrastructure') }}"
+                   class="btn btn-sm {% if not selected_type and not selected_status %}btn-primary-glow{% else %}btn-outline-glass{% endif %}">
+                    {{ t('filter_all_facilities') }}
+                </a>
+                <a href="{{ url_for('infrastructure', type='HOSPITAL') }}"
+                   class="btn btn-sm {% if selected_type == 'HOSPITAL' %}btn-primary-glow{% else %}btn-outline-glass{% endif %}">
+                    🏥 {{ t('type_hospital') }}
+                </a>
+                <a href="{{ url_for('infrastructure', type='WATER_TREATMENT') }}"
+                   class="btn btn-sm {% if selected_type == 'WATER_TREATMENT' %}btn-primary-glow{% else %}btn-outline-glass{% endif %}">
+                    💧 {{ t('type_water_treatment') }}
+                </a>
+                <a href="{{ url_for('infrastructure', type='DIALYSIS') }}"
+                   class="btn btn-sm {% if selected_type == 'DIALYSIS' %}btn-primary-glow{% else %}btn-outline-glass{% endif %}">
+                    🩸 {{ t('type_dialysis') }}
+                </a>
+                <a href="{{ url_for('infrastructure', type='CLINIC') }}"
+                   class="btn btn-sm {% if selected_type == 'CLINIC' %}btn-primary-glow{% else %}btn-outline-glass{% endif %}">
+                    🩺 {{ t('type_clinic') }}
+                </a>
+            </div>
+
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('infrastructure', status='BACKUP_GENERATOR') }}"
+                   class="btn btn-sm {% if selected_status == 'BACKUP_GENERATOR' %}btn-warning text-dark{% else %}btn-outline-warning{% endif %}">
+                    ⚡ {{ t('infra_kpi_generator') }}
+                </a>
+                <a href="{{ url_for('infrastructure', status='CRITICAL_BLACKOUT') }}"
+                   class="btn btn-sm {% if selected_status == 'CRITICAL_BLACKOUT' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+                    🚨 {{ t('infra_kpi_blackout') }}
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Facility Cards Grid -->
+    <div class="row g-3">
+        {% for f in facilities %}
+        <div class="col-12 col-md-6 col-lg-4">
+            <div class="card bg-dark-glass border-glass p-4 h-100 d-flex flex-column justify-content-between position-relative overflow-hidden">
+                <!-- Status Bar Top Indicator -->
+                {% if f.current_power_status == 'ON_GRID' %}
+                <div class="position-absolute top-0 start-0 end-0 bg-success" style="height: 3px;"></div>
+                {% elif f.current_power_status == 'BACKUP_GENERATOR' %}
+                <div class="position-absolute top-0 start-0 end-0 bg-warning" style="height: 3px;"></div>
+                {% else %}
+                <div class="position-absolute top-0 start-0 end-0 bg-danger" style="height: 3px;"></div>
+                {% endif %}
+
+                <div>
+                    <!-- Header Badges -->
+                    <div class="d-flex justify-content-between align-items-start mb-2 gap-2">
+                        <span class="badge bg-secondary-glass small">
+                            {% if f.facility_type == 'HOSPITAL' %}🏥 Hôpital
+                            {% elif f.facility_type == 'WATER_TREATMENT' %}💧 Eau Potable
+                            {% elif f.facility_type == 'DIALYSIS' %}🩸 Hémodialyse
+                            {% elif f.facility_type == 'BLOOD_BANK' %}💉 Banque Sang
+                            {% elif f.facility_type == 'OXYGEN_PLANT' %}💨 Oxygène
+                            {% else %}🩺 Clinique{% endif %}
+                        </span>
+
+                        {% if f.current_power_status == 'ON_GRID' %}
+                        <span class="badge bg-success-glass text-success fw-bold d-flex align-items-center gap-1">
+                            <span class="pulsing-dot bg-success"></span> Réseau Eneo
+                        </span>
+                        {% elif f.current_power_status == 'BACKUP_GENERATOR' %}
+                        <span class="badge bg-warning-glass text-warning fw-bold d-flex align-items-center gap-1">
+                            <span class="pulsing-dot bg-warning"></span> Groupe Secours
+                        </span>
+                        {% else %}
+                        <span class="badge bg-danger-glass text-danger fw-bold d-flex align-items-center gap-1">
+                            <span class="pulsing-dot bg-danger"></span> Panne Totale
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Facility Name -->
+                    <h5 class="fw-bold text-white mb-1 mt-2">{{ f.name }}</h5>
+                    <div class="text-muted small mb-3">
+                        <span>📍 {{ f.neighborhood }}</span>
+                        {% if f.address %} &bull; <span>{{ f.address }}</span>{% endif %}
+                    </div>
+
+                    <!-- Generator & Fuel Metrics -->
+                    <div class="bg-darker rounded p-3 mb-3 border border-secondary border-opacity-10">
+                        <div class="d-flex justify-content-between small text-muted mb-1">
+                            <span>Groupe électrogène :</span>
+                            <span class="text-white fw-semibold">
+                                {% if f.has_backup_generator %}
+                                    {{ f.generator_capacity_kva or 'Standard' }} kVA
+                                {% else %}
+                                    <span class="text-danger">Aucun</span>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted mb-2">
+                            <span>Autonomie carburant :</span>
+                            <span class="{% if (f.fuel_autonomy_hours|float) > 8 %}text-success{% elif (f.fuel_autonomy_hours|float) > 4 %}text-warning{% else %}text-danger{% endif %} fw-bold">
+                                {{ f.fuel_autonomy_hours }} h estimées
+                            </span>
+                        </div>
+                        <div class="progress" style="height: 6px; background: rgba(255,255,255,0.06);">
+                            {% set pct = ((f.fuel_autonomy_hours|float) / 24.0 * 100)|round %}
+                            <div class="progress-bar {% if (f.fuel_autonomy_hours|float) > 8 %}bg-success{% elif (f.fuel_autonomy_hours|float) > 4 %}bg-warning{% else %}bg-danger{% endif %}"
+                                 style="width: {{ pct if pct <= 100 else 100 }}%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Notes description -->
+                    {% if f.notes %}
+                    <p class="small text-muted mb-3 lh-sm" style="font-size: 0.85rem;">
+                        {{ f.notes }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                <!-- Footer: Emergency Contact & Map Button -->
+                <div class="pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between align-items-center">
+                    {% if f.contact_phone %}
+                    <a href="tel:{{ f.contact_phone }}" class="btn btn-outline-glass btn-sm text-info d-flex align-items-center gap-1">
+                        <span>📞</span> {{ f.contact_phone }}
+                    </a>
+                    {% else %}
+                    <span class="text-muted small">Urgences Douala</span>
+                    {% endif %}
+
+                    {% if f.latitude and f.longitude %}
+                    <a href="https://www.google.com/maps?q={{ f.latitude }},{{ f.longitude }}"
+                       target="_blank" rel="noopener noreferrer"
+                       class="text-muted small text-decoration-none">
+                        📍 Ouvrir GPS &rarr;
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12 text-center py-5">
+            <p class="text-muted fs-5">Aucun établissement ne correspond aux filtres sélectionnés.</p>
+            <a href="{{ url_for('infrastructure') }}" class="btn btn-outline-glass btn-sm">Réinitialiser les filtres</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Leaflet Map Initialization Script for Critical Infrastructure -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const mapEl = document.getElementById('infraMap');
+    if (!mapEl) return;
+
+    // Douala center coordinates
+    const map = L.map('infraMap').setView([4.0550, 9.7200], 12);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        maxZoom: 19
+    }).addTo(map);
+
+    // Fetch infrastructure facilities JSON
+    fetch('{{ url_for("api.api_infrastructure") }}')
+        .then(res => res.json())
+        .then(facilities => {
+            facilities.forEach(f => {
+                if (!f.latitude || !f.longitude) return;
+
+                let iconColor = '#10b981'; // Green (On Grid)
+                let iconSymbol = '🏥';
+                if (f.facility_type === 'WATER_TREATMENT') iconSymbol = '💧';
+                else if (f.facility_type === 'DIALYSIS' || f.facility_type === 'BLOOD_BANK') iconSymbol = '🩸';
+
+                if (f.current_power_status === 'BACKUP_GENERATOR') {
+                    iconColor = '#f59e0b'; // Amber (Generator)
+                } else if (f.current_power_status === 'CRITICAL_BLACKOUT') {
+                    iconColor = '#ef4444'; // Red (Blackout)
+                }
+
+                const markerIcon = L.divIcon({
+                    className: 'custom-infra-marker',
+                    html: `<div style="
+                        background: ${iconColor};
+                        color: #fff;
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 18px;
+                        box-shadow: 0 0 14px ${iconColor}99;
+                        border: 2px solid rgba(255,255,255,0.8);
+                        animation: ${f.current_power_status !== 'ON_GRID' ? 'pulse 2s infinite' : 'none'};
+                    ">${iconSymbol}</div>`,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18],
+                    popupAnchor: [0, -18]
+                });
+
+                const statusText = f.current_power_status === 'ON_GRID' ? '🟢 Réseau Eneo Normal' :
+                                  (f.current_power_status === 'BACKUP_GENERATOR' ? `🟡 Groupe Secours (${f.fuel_autonomy_hours}h restantes)` :
+                                  '🔴 Panne Totale Critique');
+
+                const popupHtml = `
+                    <div style="font-family: inherit; min-width: 200px;">
+                        <h6 style="margin: 0 0 4px 0; font-weight: 700; color: #111;">${f.name}</h6>
+                        <div style="font-size: 0.8rem; color: #666; margin-bottom: 6px;">📍 ${f.neighborhood}</div>
+                        <div style="margin-bottom: 6px; font-weight: 600; font-size: 0.85rem;">${statusText}</div>
+                        <div style="font-size: 0.8rem; color: #444; margin-bottom: 8px;">
+                            Puissance : ${f.generator_capacity_kva || '—'} kVA | Contact : <a href="tel:${f.contact_phone}">${f.contact_phone || 'N/A'}</a>
+                        </div>
+                        <a href="https://www.google.com/maps?q=${f.latitude},${f.longitude}" target="_blank" style="font-size: 0.8rem; color: #0284c7; text-decoration: none; font-weight: 600;">
+                            Ouvrir dans Google Maps &rarr;
+                        </a>
+                    </div>
+                `;
+
+                L.marker([f.latitude, f.longitude], { icon: markerIcon })
+                    .addTo(map)
+                    .bindPopup(popupHtml);
+            });
+        })
+        .catch(err => console.error('Error loading infrastructure map points:', err));
+});
+</script>
+
+<style>
+.bg-dark-glass {
+    background: rgba(15, 23, 42, 0.75) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+.bg-darker {
+    background: rgba(7, 11, 20, 0.6) !important;
+}
+.border-glass {
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.btn-outline-glass {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #e2e8f0;
+}
+.btn-outline-glass:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+.btn-primary-glow {
+    background: #0284c7;
+    color: #fff;
+    border: 1px solid #38bdf8;
+    box-shadow: 0 0 12px rgba(2, 132, 199, 0.4);
+}
+.btn-primary-glow:hover {
+    background: #0369a1;
+    color: #fff;
+}
+.bg-success-glass {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.bg-warning-glass {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.bg-danger-glass {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.bg-secondary-glass {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+}
+.pulsing-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.15); opacity: 0.75; }
+    100% { transform: scale(1); opacity: 1; }
+}
+</style>
+{% endblock %}

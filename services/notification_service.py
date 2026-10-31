@@ -1,6 +1,7 @@
 """
 Notification Service for Douala Power Alert.
-Handles in-app notification records and triggers for registered neighborhood alerts.
+Handles in-app notification records and triggers for registered neighborhood alerts
+and critical infrastructure priority broadcasts.
 """
 
 from database import get_db_cursor
@@ -43,6 +44,53 @@ def create_neighborhood_notification(neighborhood, outage_id, title, message, no
     except Exception as e:
         print(f"Error creating neighborhood notifications: {e}")
         return 0
+
+
+def create_critical_infrastructure_alert(facility, outage_id, location=""):
+    """
+    Broadcasts a high-priority alert to users in the affected zone and creates an alert record
+    specifying the critical infrastructure affected (hospital, water station, dialysis).
+    """
+    if not facility:
+        return 0
+
+    facility_name = facility.get("name", "Infrastructure Vitale")
+    neighborhood = facility.get("neighborhood", "")
+    f_type = facility.get("facility_type", "HOSPITAL")
+    autonomy = facility.get("fuel_autonomy_hours", 12.0)
+    has_gen = facility.get("has_backup_generator", True)
+
+    type_labels = {
+        "HOSPITAL": "Hôpital / Urgences",
+        "WATER_TREATMENT": "Station Eau Potable Camwater",
+        "DIALYSIS": "Centre d'Hémodialyse",
+        "BLOOD_BANK": "Banque de Sang",
+        "CLINIC": "Clinique & Soins",
+        "OXYGEN_PLANT": "Production Oxygène Médical"
+    }
+    type_label = type_labels.get(f_type, "Infrastructure Critique")
+
+    title = f"🚨 ALERTE CRITIQUE : {facility_name}"
+    if has_gen:
+        msg = (
+            f"Coupure d'électricité signalée dans la zone de {facility_name} ({neighborhood}). "
+            f"L'établissement ({type_label}) est sous tension de secours par groupe électrogène "
+            f"(Autonomie estimée : {autonomy}h). Priorité d'intervention maximale requise."
+        )
+    else:
+        msg = (
+            f"URGENCE : Coupure dans la zone de {facility_name} ({neighborhood}). "
+            f"L'établissement ({type_label}) ne dispose pas de groupe de secours autonome. "
+            f"Coupure totale en cours ! Alerte déclenchée."
+        )
+
+    return create_neighborhood_notification(
+        neighborhood=neighborhood,
+        outage_id=outage_id,
+        title=title,
+        message=msg,
+        notif_type="CRITICAL_INFRASTRUCTURE"
+    )
 
 
 def get_user_notifications(user_id, limit=20):
@@ -98,14 +146,15 @@ def get_user_notifications(user_id, limit=20):
                     "location": r.get("location") or "",
                     "outage_status": r.get("outage_status") or "",
                 })
+
             return results
     except Exception as e:
-        print(f"Error fetching notifications: {e}")
+        print(f"Error fetching user notifications: {e}")
         return []
 
 
 def get_unread_count(user_id):
-    """Returns the total number of unread notifications for a user."""
+    """Returns the count of unread notifications for a user."""
     if not user_id:
         return 0
 

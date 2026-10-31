@@ -2,20 +2,25 @@
 {% block title %}{{ t('analytics_title') }} — {{ t('app_name') }}{% endblock %}
 
 {% block content %}
-<div class="page-header" style="margin-bottom: 28px;">
-    <div style="display: flex; align-items: center; gap: 14px;">
-        <div style="width: 52px; height: 52px; border-radius: var(--radius-md); background: rgba(56, 189, 248, 0.16); border: 1px solid rgba(56, 189, 248, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; box-shadow: 0 0 18px rgba(56, 189, 248, 0.25);">
-            📊
-        </div>
+<div class="page-header" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
         <div>
             <h1 style="margin: 0; font-size: 2.1rem; font-weight: 800; letter-spacing: -0.03em;">{{ t('analytics_title') }}</h1>
-            <p class="muted" style="margin: 2px 0 0; font-size: 1.02rem;">{{ t('analytics_subtitle') }}</p>
+            <p class="muted" style="margin: 4px 0 0; font-size: 0.98rem;">{{ t('analytics_subtitle') }}</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('outages.infrastructure') }}" class="btn btn-outline" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;">
+                🏥 Infrastructures Vitales
+            </a>
+            <a href="{{ url_for('outages.outages') }}" class="btn btn-outline">
+                ← {{ t('nav_outages') }}
+            </a>
         </div>
     </div>
 </div>
 
-<!-- 1. Top Metrics Grid -->
-<div class="stats-grid">
+<!-- 1. Top High-Level Metrics -->
+<div class="stats-grid" style="margin-bottom: 28px;">
     <div class="stat-card" style="border-top: 3px solid #38bdf8;">
         <div class="stat-number" style="color: #38bdf8;">{{ total_outages }}</div>
         <div class="stat-label">⚡ {{ t('th_total_outages') }}</div>
@@ -85,6 +90,57 @@
     </div>
 </section>
 
+<!-- 2.5 Critical Infrastructure & Hospitals Telemetry -->
+<section class="section" style="margin-top: 24px; margin-bottom: 32px;">
+    <div style="background: var(--bg-card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: var(--radius-xl); border: 1px solid rgba(239, 68, 68, 0.25); padding: 24px 28px; box-shadow: var(--shadow-lg);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.4rem;">🏥</span>
+                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 800; color: #f8fafc;">
+                    Infrastructures Vitales & Hôpitaux
+                </h3>
+            </div>
+            <a href="{{ url_for('infrastructure') }}" class="btn btn-sm btn-outline" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;">
+                🏥 Carte des sites critiques →
+            </a>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); padding: 14px 18px;">
+                <div class="muted small text-uppercase fw-semibold">Établissements Surveillés</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: #f8fafc; margin: 4px 0;">
+                    {{ facilities_kpis.total }} <span style="font-size: 0.85rem; font-weight: 600; color: #38bdf8;">sites</span>
+                </div>
+                <div class="muted" style="font-size: 0.8rem;">Hôpitaux, eau potable, hémodialyse</div>
+            </div>
+
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 14px 18px;">
+                <div class="small fw-semibold text-uppercase" style="color: #34d399;">Réseau Eneo Normal</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: #34d399; margin: 4px 0;">
+                    {{ facilities_kpis.on_grid }} <span style="font-size: 0.85rem; font-weight: 600;">({{ facilities_kpis.grid_percent }}%)</span>
+                </div>
+                <div class="muted" style="font-size: 0.8rem;">Alimentation principale active</div>
+            </div>
+
+            <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-md); padding: 14px 18px;">
+                <div class="small fw-semibold text-uppercase" style="color: #fbbf24;">Sur Groupe Électrogène</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: #fbbf24; margin: 4px 0;">
+                    {{ facilities_kpis.backup_generator }} <span style="font-size: 0.85rem; font-weight: 600;">site(s)</span>
+                </div>
+                <div class="muted" style="font-size: 0.8rem;">Alimentation d'urgence active</div>
+            </div>
+
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-md); padding: 14px 18px;">
+                <div class="small fw-semibold text-uppercase" style="color: #f87171;">Panne Critique Totale</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: #f87171; margin: 4px 0;">
+                    {{ facilities_kpis.critical_blackout }} <span style="font-size: 0.85rem; font-weight: 600;">site(s)</span>
+                </div>
+                <div class="muted" style="font-size: 0.8rem;">{% if facilities_kpis.critical_blackout > 0 %}🚨 Alerte maximale déclenchée{% else %}Aucune rupture complète{% endif %}</div>
+            </div>
+        </div>
+    </div>
+</section>
+
 <!-- 3. Interactive Heatmap Section -->
 <section class="section" style="margin-top: 36px;">
     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap; gap: 14px;">
@@ -140,6 +196,11 @@
                 <tr>
                     <td>
                         <strong style="font-size: 1.02rem; color: #f8fafc;">{{ n.neighborhood }}</strong>
+                        {% if n.critical_count and n.critical_count > 0 %}
+                        <span class="badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-size: 0.72rem; margin-left: 6px;">
+                            🚨 {{ n.critical_count }} site(s)
+                        </span>
+                        {% endif %}
                     </td>
                     <td>
                         <div style="background: rgba(255, 255, 255, 0.08); border-radius: 9999px; height: 9px; width: 100%; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.05);">
@@ -180,8 +241,8 @@
         </table>
     </div>
     {% else %}
-    <div style="padding: 36px; text-align: center; background: var(--bg-card); border-radius: var(--radius-lg); border: 1px solid var(--border-glass);">
-        <p class="muted" style="margin: 0;">{{ t('no_analytics_data') }}</p>
+    <div style="background: var(--bg-card); padding: 48px; border-radius: var(--radius-xl); text-align: center; border: 1px solid var(--border-glass);">
+        <p class="muted" style="margin: 0; font-size: 1rem;">{{ t('no_analytics_data') }}</p>
     </div>
     {% endif %}
 </section>
@@ -190,109 +251,7 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        var mapEl = document.getElementById('analyticsMap');
-        if (!mapEl || typeof L === 'undefined') return;
-
-        // Initialize map on Douala
-        var map = L.map('analyticsMap', {
-            zoomControl: true,
-            scrollWheelZoom: false
-        }).setView([4.0511, 9.7679], 12);
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap',
-            maxZoom: 18
-        }).addTo(map);
-
-        var markersGroup = L.layerGroup().addTo(map);
-        var heatGroup = L.layerGroup().addTo(map);
-
-        // 1. Fetch markers
-        fetch('/api/outages/map')
-            .then(function (res) { return res.json(); })
-            .then(function (markers) {
-                markers.forEach(function (m) {
-                    var color = m.status === 'RESTORED' ? '#10b981' : (m.status === 'PENDING' ? '#f59e0b' : '#ef4444');
-                    var typeLabel = m.outage_type === 'SCHEDULED' ? '⚡ Planifié (Eneo)' : '⚠️ Panne Imprévue';
-
-                    var iconHtml = '<div class="custom-marker-wrap">' +
-                        '<div class="marker-core" style="background:' + color + '; width:14px; height:14px;"></div>' +
-                    '</div>';
-
-                    var icon = L.divIcon({
-                        className: 'custom-leaflet-marker',
-                        html: iconHtml,
-                        iconSize: [16, 16],
-                        iconAnchor: [8, 8]
-                    });
-
-                    var marker = L.marker([m.lat, m.lng], { icon: icon });
-                    marker.bindPopup(
-                        '<div style="font-family: inherit;">' +
-                            '<strong style="font-size: 1rem; color: #f8fafc;">' + m.neighborhood + '</strong><br>' +
-                            '<span style="font-size: 0.85rem; color:#94a3b8;">' + m.location + '</span><br>' +
-                            '<span style="display:inline-block; margin: 4px 0; font-size:0.78rem; font-weight:700; color:#c084fc;">' + typeLabel + '</span><br>' +
-                            '<span style="font-weight:700; font-size:0.85rem; color:' + color + ';">' + m.status + '</span>' +
-                        '</div>'
-                    );
-                    markersGroup.addLayer(marker);
-                });
-            });
-
-        // 2. Fetch Heatmap points
-        fetch('/api/analytics/heatmap')
-            .then(function (res) { return res.json(); })
-            .then(function (points) {
-                if (typeof L.heatLayer === 'function' && points.length > 0) {
-                    var heat = L.heatLayer(points, {
-                        radius: 30,
-                        blur: 20,
-                        maxZoom: 16,
-                        max: 1.0,
-                        gradient: {
-                            0.2: '#3b82f6',
-                            0.5: '#10b981',
-                            0.7: '#f59e0b',
-                            1.0: '#ef4444'
-                        }
-                    });
-                    heatGroup.addLayer(heat);
-                }
-            });
-
-        // 3. Layer Mode Buttons
-        var btnHeat = document.getElementById('btnModeHeatmap');
-        var btnMark = document.getElementById('btnModeMarkers');
-        var btnBoth = document.getElementById('btnModeBoth');
-
-        function setActiveButton(activeBtn) {
-            [btnHeat, btnMark, btnBoth].forEach(function (b) {
-                b.classList.remove('btn-primary');
-                b.classList.add('btn-outline');
-                b.style.boxShadow = 'none';
-            });
-            activeBtn.classList.remove('btn-outline');
-            activeBtn.classList.add('btn-primary');
-            activeBtn.style.boxShadow = '0 4px 14px rgba(37, 99, 235, 0.35)';
-        }
-
-        btnHeat.addEventListener('click', function () {
-            setActiveButton(btnHeat);
-            if (!map.hasLayer(heatGroup)) map.addLayer(heatGroup);
-            if (map.hasLayer(markersGroup)) map.removeLayer(markersGroup);
-        });
-
-        btnMark.addEventListener('click', function () {
-            setActiveButton(btnMark);
-            if (!map.hasLayer(markersGroup)) map.addLayer(markersGroup);
-            if (map.hasLayer(heatGroup)) map.removeLayer(heatGroup);
-        });
-
-        btnBoth.addEventListener('click', function () {
-            setActiveButton(btnBoth);
-            if (!map.hasLayer(heatGroup)) map.addLayer(heatGroup);
-            if (!map.hasLayer(markersGroup)) map.addLayer(markersGroup);
-        });
+        initAnalyticsHeatmap('analyticsMap');
     });
 </script>
 {% endblock %}

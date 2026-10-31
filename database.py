@@ -135,6 +135,9 @@ def init_db():
                     status ENUM('PENDING', 'VERIFIED', 'RESTORED', 'REJECTED') DEFAULT 'PENDING',
                     latitude DECIMAL(10, 7) NULL,
                     longitude DECIMAL(10, 7) NULL,
+                    outage_type ENUM('UNPLANNED', 'SCHEDULED') DEFAULT 'UNPLANNED',
+                    schedule_id INT NULL,
+                    affects_critical BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -184,11 +187,33 @@ def init_db():
                 ) ENGINE=InnoDB;
             """)
 
-            # Migration: ensure latitude, longitude, outage_type, and schedule_id columns exist in outages table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS critical_facilities (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(200) NOT NULL,
+                    facility_type ENUM('HOSPITAL', 'CLINIC', 'WATER_TREATMENT', 'DIALYSIS', 'BLOOD_BANK', 'OXYGEN_PLANT') NOT NULL,
+                    neighborhood VARCHAR(100) NOT NULL,
+                    address VARCHAR(255) NULL,
+                    latitude DECIMAL(10, 7) NOT NULL,
+                    longitude DECIMAL(10, 7) NOT NULL,
+                    has_backup_generator BOOLEAN DEFAULT TRUE,
+                    generator_capacity_kva INT NULL,
+                    fuel_autonomy_hours DECIMAL(5, 2) DEFAULT 12.0,
+                    current_power_status ENUM('ON_GRID', 'BACKUP_GENERATOR', 'CRITICAL_BLACKOUT') DEFAULT 'ON_GRID',
+                    contact_name VARCHAR(150) NULL,
+                    contact_phone VARCHAR(50) NULL,
+                    notes TEXT NULL,
+                    last_status_change TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_facility_zone (neighborhood, facility_type, current_power_status)
+                ) ENGINE=InnoDB;
+            """)
+
+            # Migration: ensure latitude, longitude, outage_type, schedule_id, and affects_critical columns exist in outages table
             cur.execute("""
                 SELECT COLUMN_NAME
                 FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'outages' AND COLUMN_NAME IN ('latitude', 'longitude', 'outage_type', 'schedule_id')
+                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'outages' AND COLUMN_NAME IN ('latitude', 'longitude', 'outage_type', 'schedule_id', 'affects_critical')
             """, (os.getenv("DB_NAME", "douala_power_alert"),))
             existing_cols = [r["COLUMN_NAME"] if isinstance(r, dict) else r[0] for r in cur.fetchall()]
 
@@ -200,7 +225,10 @@ def init_db():
                 cur.execute("ALTER TABLE outages ADD COLUMN outage_type ENUM('UNPLANNED', 'SCHEDULED') DEFAULT 'UNPLANNED';")
             if "schedule_id" not in existing_cols:
                 cur.execute("ALTER TABLE outages ADD COLUMN schedule_id INT NULL;")
+            if "affects_critical" not in existing_cols:
+                cur.execute("ALTER TABLE outages ADD COLUMN affects_critical BOOLEAN DEFAULT FALSE;")
         ensure_admin()
+        ensure_default_critical_facilities()
     except Exception as e:
         print(f"Database initialization warning: {e}")
 
@@ -223,4 +251,13 @@ def ensure_admin():
                     (hashed, "admin"),
                 )
     except Error:
+        pass
+
+
+def ensure_default_critical_facilities():
+    """Ensure baseline critical facilities for Douala exist in the database."""
+    try:
+        from services.facility_service import seed_douala_critical_facilities
+        seed_douala_critical_facilities(overwrite=False)
+    except Exception:
         pass

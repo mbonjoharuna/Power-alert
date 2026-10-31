@@ -3,40 +3,77 @@
 
 {% block content %}
 <div class="page-header" style="margin-bottom: 24px;">
-    <a href="{{ url_for('outages') }}" class="back-link" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: #38bdf8; margin-bottom: 12px;">
-        ← {{ t('back_to_outages') }}
+    <a href="{{ url_for('outages') }}" class="back-link" style="font-weight: 700; color: #38bdf8; display: inline-flex; align-items: center; gap: 6px;">
+        {{ t('back_to_outages') }}
     </a>
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
-        <div>
-            <span style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #38bdf8;">Incident #{{ outage.id }}</span>
-            <h1 style="margin: 2px 0 0; font-size: 2rem; font-weight: 800; letter-spacing: -0.02em;">📍 {{ outage.neighborhood | upper }}</h1>
-        </div>
-        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; flex-wrap: wrap; gap: 12px;">
+        <h1 style="font-size: 2.2rem; font-weight: 800; letter-spacing: -0.03em; margin: 0;">
+            {{ t('outage_detail_title') }}{{ outage.id }}
+            <span class="muted" style="font-weight: 400; font-size: 1.5rem;">— {{ outage.neighborhood }}</span>
+        </h1>
+        <div style="display: flex; gap: 8px; align-items: center;">
             {% if outage.outage_type == 'SCHEDULED' %}
-            <span class="status-badge" style="background: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.45); box-shadow: 0 0 12px rgba(168, 85, 247, 0.25);">
-                ⚡ {{ t('badge_scheduled') }}
-            </span>
+                <span class="status-badge" style="background: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.45); font-size: 0.88rem; padding: 6px 14px;">
+                    ⚡ {{ t('badge_scheduled_short') }}
+                </span>
             {% else %}
-            <span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35);">
-                ⚠️ {{ t('badge_unplanned') }}
-            </span>
+                <span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); font-size: 0.88rem; padding: 6px 14px;">
+                    ⚠️ {{ t('badge_unplanned_short') }}
+                </span>
             {% endif %}
-            <span class="status-badge status-{{ outage.status | lower }}">
-                {% if outage.status == 'VERIFIED' %}🔴 {{ t('status_verified') }}
-                {% elif outage.status == 'PENDING' %}🟡 {{ t('status_pending') }}
-                {% elif outage.status == 'RESTORED' %}🟢 {{ t('status_restored') }}
-                {% else %}{{ outage.status }}{% endif %}
-            </span>
-            {% if outage.conf_off >= 3 %}
-            <span class="status-badge" style="background: rgba(37, 99, 235, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); box-shadow: 0 0 12px rgba(37, 99, 235, 0.25);">
-                👥 {{ t('badge_community_verified') }} ({{ outage.conf_off }})
-            </span>
+            {% if outage.affects_critical %}
+                <span class="status-badge" style="background: rgba(239, 68, 68, 0.25); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.5); font-size: 0.88rem; padding: 6px 14px;">
+                    🚨 Zone Critique
+                </span>
             {% endif %}
         </div>
     </div>
 </div>
 
-<div class="detail-card">
+<!-- Critical Infrastructure Zone Alert -->
+{% if nearby_facilities %}
+<div class="card mb-4" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.3); border-left: 5px solid #ef4444; border-radius: var(--radius-lg); padding: 20px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+        <h4 style="margin: 0; color: #fca5a5; font-size: 1.15rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+            <span>🚨</span> {{ t('outage_details_critical_title') }}
+        </h4>
+        <a href="{{ url_for('outages.infrastructure') }}" style="font-size: 0.82rem; color: #38bdf8; text-decoration: none; font-weight: 700;">
+            Ouvrir la carte des hôpitaux →
+        </a>
+    </div>
+    <p class="muted" style="margin-bottom: 14px; font-size: 0.9rem;">
+        {{ t('outage_details_critical_desc') }}
+    </p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px;">
+        {% for f in nearby_facilities %}
+        <div style="background: rgba(15, 23, 42, 0.7); padding: 12px 14px; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.08);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px;">
+                <strong style="color: #f8fafc; font-size: 0.95rem;">{{ f.name }}</strong>
+                {% if f.current_power_status == 'ON_GRID' %}
+                    <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">
+                        🟢 Réseau Eneo
+                    </span>
+                {% elif f.current_power_status == 'BACKUP_GENERATOR' %}
+                    <span style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">
+                        🟡 Groupe ({{ f.fuel_autonomy_hours }}h)
+                    </span>
+                {% else %}
+                    <span style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 700;">
+                        🔴 Panne Totale
+                    </span>
+                {% endif %}
+            </div>
+            <div class="muted" style="font-size: 0.82rem;">
+                <span>📍 {{ f.neighborhood }}</span>
+                {% if f.contact_phone %} &bull; <span>📞 <a href="tel:{{ f.contact_phone }}" style="color: #38bdf8;">{{ f.contact_phone }}</a></span>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="card detail-card" style="padding: 28px;">
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--border-glass);">
         <div style="width: 44px; height: 44px; border-radius: var(--radius-md); background: rgba(37, 99, 235, 0.16); border: 1px solid rgba(37, 99, 235, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.4rem;">
             ⚡

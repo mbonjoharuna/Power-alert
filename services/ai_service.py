@@ -2,7 +2,8 @@
 AI Assistant service for Douala Power Alert.
 Supports French (default) and English.
 Uses external API if AI_API_KEY is set, otherwise falls back
-to intelligent rule-based answers from live database context.
+to intelligent rule-based answers from live database context,
+including Eneo scheduled rotas and critical infrastructure (hospitals, water stations) power status.
 """
 
 import os
@@ -17,10 +18,10 @@ AI_MODEL = os.getenv("AI_MODEL", "gpt-3.5-turbo")
 
 
 def get_outage_context(cursor, lang="fr"):
-    """Build a short text summary of current outages from the database in the given language."""
+    """Build a short text summary of current outages and critical facilities from the database in the given language."""
     cursor.execute("""
         SELECT o.neighborhood, o.location, o.status, o.start_time, o.estimated_restore,
-               o.outage_type, s.title AS schedule_title
+               o.outage_type, o.affects_critical, s.title AS schedule_title
         FROM outages o
         LEFT JOIN scheduled_outages s ON o.schedule_id = s.id
         WHERE o.status IN ('PENDING', 'VERIFIED', 'RESTORED')
@@ -29,30 +30,49 @@ def get_outage_context(cursor, lang="fr"):
     """)
     rows = cursor.fetchall()
 
-    if not rows:
+    lines = []
+    if rows:
+        for r in rows:
+            est = r["estimated_restore"]
+            o_type = "Planifié (Eneo)" if r.get("outage_type") == "SCHEDULED" else "Panne imprévue"
+            crit_note = " [IMPACTE INFRASTRUCTURE CRITIQUE]" if r.get("affects_critical") else ""
+            if lang == "fr":
+                est_str = est.strftime("%d/%m/%Y à %H:%M") if est else "Aucune estimation vérifiée disponible."
+                status_fr = {"PENDING": "En attente", "VERIFIED": "Confirmé (Coupé)", "RESTORED": "Rétabli"}.get(r["status"], r["status"])
+                lines.append(
+                    f"- {r['neighborhood']} ({r['location']}) [{o_type}]{crit_note} : statut={status_fr}, "
+                    f"début={r['start_time']}, rétablissement_estimé={est_str}"
+                )
+            else:
+                o_type_en = "Planned (Eneo)" if r.get("outage_type") == "SCHEDULED" else "Unplanned"
+                crit_note_en = " [CRITICAL INFRASTRUCTURE IMPACT]" if r.get("affects_critical") else ""
+                est_str = est.strftime("%d %B %Y - %H:%M") if est else "No verified restoration estimate is currently available."
+                lines.append(
+                    f"- {r['neighborhood']} ({r['location']}) [{o_type_en}]{crit_note_en}: status={r['status']}, "
+                    f"started={r['start_time']}, estimated_restore={est_str}"
+                )
+
+    # Telemetry for critical facilities
+    try:
+        cursor.execute("""
+            SELECT name, facility_type, neighborhood, current_power_status, fuel_autonomy_hours
+            FROM critical_facilities
+            LIMIT 10
+        """)
+        facs = cursor.fetchall()
+        if facs:
+            lines.append("\nÉtat des infrastructures vitales surveillées :")
+            for f in facs:
+                st = f.get("current_power_status", "ON_GRID")
+                lines.append(f"  * {f['name']} ({f['neighborhood']}) : statut={st}, autonomie_groupe={f.get('fuel_autonomy_hours')}h")
+    except Exception:
+        pass
+
+    if not lines:
         if lang == "fr":
             return "Il n'y a actuellement aucun signalement de coupure dans le système."
         return "There are currently no reported outages in the system."
 
-    lines = []
-    for r in rows:
-        est = r["estimated_restore"]
-        o_type = "Planifié (Eneo)" if r.get("outage_type") == "SCHEDULED" else "Panne imprévue"
-        if lang == "fr":
-            est_str = est.strftime("%d/%m/%Y à %H:%M") if est else "Aucune estimation vérifiée disponible."
-            status_fr = {"PENDING": "En attente", "VERIFIED": "Confirmé (Coupé)", "RESTORED": "Rétabli"}.get(r["status"], r["status"])
-            lines.append(
-                f"- {r['neighborhood']} ({r['location']}) [{o_type}] : statut={status_fr}, "
-                f"début={r['start_time']}, rétablissement_estimé={est_str}"
-            )
-        else:
-            o_type_en = "Planned (Eneo)" if r.get("outage_type") == "SCHEDULED" else "Unplanned"
-            est_str = est.strftime("%d %B %Y - %H:%M") if est else "No verified restoration estimate is currently available."
-            lines.append(
-                f"- {r['neighborhood']} ({r['location']}) [{o_type_en}]: status={r['status']}, "
-                f"started={r['start_time']}, estimated_restore={est_str}"
-            )
-            
     header = "Données actuelles des coupures :\n" if lang == "fr" else "Current outage data:\n"
     return header + "\n".join(lines)
 
@@ -81,73 +101,44 @@ def get_historical_prediction(neighborhood, cursor, lang="fr"):
                     WHEN estimated_restore IS NOT NULL AND estimated_restore > start_time 
                     THEN TIMESTAMPDIFF(MINUTE, start_time, estimated_restore)
                     ELSE NULL 
-                END) AS avg_duration_mins,
-                DAYNAME(start_time) AS common_day,
-                COUNT(*) AS total_reports
+                END) AS avg_mins,
+                DAYNAME(start_time) AS day_of_week,
+                COUNT(*) AS count_samples
             FROM outages
             WHERE LOWER(neighborhood) LIKE %s
+              AND (status = 'RESTORED' OR estimated_restore IS NOT NULL)
             GROUP BY DAYNAME(start_time)
-            ORDER BY total_reports DESC
+            ORDER BY count_samples DESC
             LIMIT 1
         """, (f"%{clean_n}%",))
         row = cursor.fetchone()
 
-        if row and row.get("avg_duration_mins") is not None and row["avg_duration_mins"] > 10:
-            hrs = round(float(row["avg_duration_mins"]) / 60.0, 1)
-            day = row.get("common_day")
+        if row and row.get("avg_mins"):
+            hrs = round(float(row["avg_mins"]) / 60.0, 1)
+            day_name = row.get("day_of_week") or "ce jour"
+            day_fr = day_map_fr.get(day_name, f"le {day_name}")
+
             if lang == "fr":
-                day_txt = f" (notamment {day_map_fr.get(day, '')})" if day else ""
-                return f"💡 Prédiction IA : Historiquement, les coupures à {neighborhood.capitalize()}{day_txt} durent en moyenne {hrs}h avant rétablissement."
-            else:
-                day_txt = f" (notably on {day}s)" if day else ""
-                return f"💡 AI Prediction: Historically, outages in {neighborhood.capitalize()}{day_txt} average {hrs} hours before restoration."
+                return f"💡 Prédiction IA : Historiquement, les coupures à {neighborhood.capitalize()} {day_fr} durent en moyenne {hrs}h avant rétablissement."
+            return f"💡 AI Prediction: Historically, outages in {neighborhood.capitalize()} on {day_name}s average {hrs} hours before restoration."
 
-        # Empirical baseline priors for Douala neighborhoods when database has few closed records yet
-        neighborhood_baselines = {
-            "deido": 4.2,
-            "bonaberi": 5.4,
-            "bonamoussadi": 3.4,
-            "akwa": 2.8,
-            "bonanjo": 2.2,
-            "makepe": 3.6,
-            "new bell": 4.6,
-            "bassa": 4.1,
-            "logbaba": 4.5,
-            "kotto": 3.2,
-            "ndokoti": 4.8,
-            "yassa": 3.8,
-            "bonapriso": 2.5,
-        }
-        for key, base_hrs in neighborhood_baselines.items():
-            if key in clean_n:
-                import datetime
-                cur_day = datetime.datetime.now().strftime("%A")
-                if lang == "fr":
-                    day_txt = f" {day_map_fr.get(cur_day, '')}"
-                    return f"💡 Prédiction IA : Historiquement, les coupures à {neighborhood.capitalize()}{day_txt} durent en moyenne {base_hrs}h avant rétablissement."
-                else:
-                    day_txt = f" on {cur_day}s"
-                    return f"💡 AI Prediction: Historically, outages in {neighborhood.capitalize()}{day_txt} average {base_hrs} hours before restoration."
-
-        # Citywide fallback if specific neighborhood lacks sufficient duration history
+        # General citywide average if neighborhood has low sample count
         cursor.execute("""
-            SELECT 
-                AVG(CASE 
-                    WHEN status = 'RESTORED' AND updated_at > start_time 
-                    THEN TIMESTAMPDIFF(MINUTE, start_time, updated_at)
-                    WHEN estimated_restore IS NOT NULL AND estimated_restore > start_time 
-                    THEN TIMESTAMPDIFF(MINUTE, start_time, estimated_restore)
-                    ELSE NULL 
-                END) AS city_avg
+            SELECT AVG(CASE 
+                WHEN status = 'RESTORED' AND updated_at > start_time 
+                THEN TIMESTAMPDIFF(MINUTE, start_time, updated_at)
+                WHEN estimated_restore IS NOT NULL AND estimated_restore > start_time 
+                THEN TIMESTAMPDIFF(MINUTE, start_time, estimated_restore)
+                ELSE NULL 
+            END) AS city_avg
             FROM outages
         """)
-        city_row = cursor.fetchone()
-        if city_row and city_row.get("city_avg") is not None and city_row["city_avg"] > 15:
-            c_hrs = round(float(city_row["city_avg"]) / 60.0, 1)
+        c_row = cursor.fetchone()
+        if c_row and c_row.get("city_avg"):
+            c_hrs = round(float(c_row["city_avg"]) / 60.0, 1)
             if lang == "fr":
-                return f"💡 Tendance générale : À Douala, la durée moyenne constatée d'une coupure est de {c_hrs}h."
-            else:
-                return f"💡 General Trend: In Douala, the observed average outage duration is {c_hrs} hours."
+                return f"💡 Prédiction IA : Historiquement à Douala, la durée moyenne constatée d'une coupure est de {c_hrs}h avant rétablissement."
+            return f"💡 AI Prediction: Historically in Douala, the observed average outage duration is {c_hrs} hours before restoration."
     except Exception:
         pass
     return None
@@ -159,7 +150,7 @@ def ask_ai(question, cursor, lang="fr"):
     Never invent restoration times.
     """
     q_lower = question.lower().strip()
-    french_indicators = ["où", "ou", "quand", "coupure", "électricité", "electricite", "courant", "quartier", "bonjour", "faire", "revenir", "rétablissement", "retablissement"]
+    french_indicators = ["où", "ou", "quand", "coupure", "électricité", "electricite", "courant", "quartier", "bonjour", "faire", "revenir", "rétablissement", "retablissement", "hôpital", "hopital", "eau"]
     if any(w in q_lower for w in french_indicators):
         lang = "fr"
 
@@ -193,7 +184,77 @@ def _rule_based_answer(question, context, cursor, lang="fr"):
             found_neighborhood = n
             break
 
-    # 1. Which areas / Quelles zones
+    # 1. Critical Infrastructure, Hospitals, Clinics & Water Stations inquiries
+    infra_kw = [
+        "hôpital", "hopital", "hospital", "laquintinie", "général", "general",
+        "camwater", "eau", "water", "dialyse", "dialysis", "sang", "blood",
+        "clinique", "infrastructure", "urgences", "maternité", "maternite",
+        "bonassama", "japoma", "bépanda", "bepanda"
+    ]
+    if any(w in question for w in infra_kw):
+        try:
+            # Check if a specific critical facility is queried
+            query = "SELECT * FROM critical_facilities WHERE 1=1"
+            params = []
+            if "laquintinie" in question:
+                query += " AND LOWER(name) LIKE '%laquintinie%'"
+            elif "général" in question or "general" in question:
+                query += " AND LOWER(name) LIKE '%général%'"
+            elif "bonassama" in question:
+                query += " AND LOWER(name) LIKE '%bonassama%'"
+            elif "camwater" in question or "eau" in question or "water" in question or "japoma" in question:
+                query += " AND (LOWER(name) LIKE '%camwater%' OR LOWER(name) LIKE '%eau%' OR facility_type = 'WATER_TREATMENT')"
+            elif "dialyse" in question or "dialysis" in question:
+                query += " AND facility_type = 'DIALYSIS'"
+            elif "sang" in question or "blood" in question:
+                query += " AND facility_type = 'BLOOD_BANK'"
+            elif found_neighborhood:
+                query += " AND LOWER(neighborhood) LIKE %s"
+                params.append(f"%{found_neighborhood}%")
+
+            cursor.execute(query + " LIMIT 5", tuple(params))
+            fac_rows = cursor.fetchall()
+
+            if fac_rows:
+                lines = []
+                for f in fac_rows:
+                    st = f.get("current_power_status", "ON_GRID")
+                    autonomy = f.get("fuel_autonomy_hours", 12.0)
+                    gen_kva = f.get("generator_capacity_kva")
+                    kva_str = f" ({gen_kva} kVA)" if gen_kva else ""
+                    phone = f.get("contact_phone") or "Non spécifié"
+
+                    if st == "ON_GRID":
+                        st_fr = "🟢 Alimenté par le Réseau Eneo (Fonctionnement normal)"
+                        st_en = "🟢 Powered by Eneo Grid (Normal operation)"
+                    elif st == "BACKUP_GENERATOR":
+                        st_fr = f"🟡 Sous tension par groupe électrogène{kva_str} — Autonomie restante estimée : {autonomy}h"
+                        st_en = f"🟡 Running on Backup Generator{kva_str} — Estimated fuel remaining: {autonomy}h"
+                    else:
+                        st_fr = "🔴 ALERTE PANNE CRITIQUE TOTALE (Groupe hors-service ou carburant épuisé)"
+                        st_en = "🔴 CRITICAL TOTAL BLACKOUT ALERT (Generator down or out of fuel)"
+
+                    if lang == "fr":
+                        lines.append(
+                            f"🏥 **{f['name']}** ({f['neighborhood']}) :\n"
+                            f"   • Alimentation : {st_fr}\n"
+                            f"   • Contact urgence : {phone}\n"
+                            f"   • Mission : {f.get('notes') or 'Établissement prioritaire'}"
+                        )
+                    else:
+                        lines.append(
+                            f"🏥 **{f['name']}** ({f['neighborhood']}):\n"
+                            f"   • Power Status: {st_en}\n"
+                            f"   • Emergency Contact: {phone}\n"
+                            f"   • Details: {f.get('notes') or 'Priority vital infrastructure'}"
+                        )
+
+                header = "État de l'alimentation des infrastructures vitales à Douala :\n\n" if lang == "fr" else "Power status for Douala critical infrastructure:\n\n"
+                return header + "\n\n".join(lines)
+        except Exception:
+            pass
+
+    # 2. Which areas / Quelles zones
     which_areas_kw = [
         "which areas", "where", "current outages", "list outages", "areas currently",
         "quelles zones", "quels quartiers", "où y a-t-il", "ou y a t il", "liste des coupures",
@@ -223,11 +284,11 @@ def _rule_based_answer(question, context, cursor, lang="fr"):
             parts = [f"{r['neighborhood']} ({r['status']}, {r['cnt']} report(s))" for r in rows]
             return "Areas with reported outages:\n• " + "\n• ".join(parts)
 
-    # 2. Specific neighborhood lookup
+    # 3. Specific neighborhood lookup
     if found_neighborhood or "coupure à" in question or "coupure a" in question or "outage in" in question or "is there" in question:
         search = found_neighborhood or question
         cursor.execute("""
-            SELECT neighborhood, location, status, start_time, estimated_restore
+            SELECT neighborhood, location, status, start_time, estimated_restore, affects_critical
             FROM outages
             WHERE LOWER(neighborhood) LIKE %s
               AND status IN ('PENDING', 'VERIFIED', 'RESTORED')
@@ -243,17 +304,19 @@ def _rule_based_answer(question, context, cursor, lang="fr"):
         lines = []
         for r in rows:
             est = r["estimated_restore"]
+            crit_badge = " [🚨 Zone Critique / Médicale]" if r.get("affects_critical") else ""
             if lang == "fr":
                 st_fr = "Confirmé (Coupé)" if r["status"] == "VERIFIED" else ("Rétabli" if r["status"] == "RESTORED" else "En attente")
                 est_str = est.strftime("%d/%m/%Y à %H:%M") if (est and r["status"] != "RESTORED") else "Aucune estimation vérifiée disponible."
                 lines.append(
-                    f"{r['neighborhood']} – {r['location']} : {st_fr}. "
+                    f"{r['neighborhood']} – {r['location']}{crit_badge} : {st_fr}. "
                     f"Début : {r['start_time']}. Estimation rétablissement : {est_str}"
                 )
             else:
+                crit_badge_en = " [🚨 Critical Medical Zone]" if r.get("affects_critical") else ""
                 est_str = est.strftime("%d %B %Y - %H:%M") if (est and r["status"] != "RESTORED") else "No verified restoration estimate is currently available."
                 lines.append(
-                    f"{r['neighborhood']} – {r['location']}: {r['status']}. "
+                    f"{r['neighborhood']} – {r['location']}{crit_badge_en}: {r['status']}. "
                     f"Started: {r['start_time']}. Estimate: {est_str}"
                 )
         ans = "\n".join(lines)
@@ -262,7 +325,7 @@ def _rule_based_answer(question, context, cursor, lang="fr"):
             ans += "\n\n" + prediction
         return ans
 
-    # 2.5 Scheduled Eneo Maintenance & Rotas inquiries
+    # 4. Scheduled Eneo Maintenance & Rotas inquiries
     sched_kw = ["planifié", "planifie", "programmé", "programme", "calendrier", "schedule", "maintenance", "travaux", "rotas", "eneo"]
     if any(w in question for w in sched_kw):
         query = """
@@ -296,17 +359,24 @@ def _rule_based_answer(question, context, cursor, lang="fr"):
                 return f"Aucun délestage ou maintenance Eneo n'est actuellement programmé pour {found_neighborhood.capitalize()}. Les coupures signalées dans cette zone sont donc répertoriées comme des pannes techniques imprévues."
             return f"No planned Eneo load-shedding is currently scheduled for {found_neighborhood.capitalize()}. Any reported outages are classified as unplanned technical grid failures."
 
-    # 3. Restoration time inquiries
+    # 5. Restoration time inquiries
     time_kw = ["when", "return", "restore", "restoration", "expected", "quand", "heure", "revenir", "rétablissement", "retablissement", "fin"]
     if any(w in question for w in time_kw):
-        cursor.execute("""
-            SELECT neighborhood, estimated_restore, status
+        query = """
+            SELECT neighborhood, estimated_restore
             FROM outages
-            WHERE status = 'VERIFIED' AND estimated_restore IS NOT NULL
-            ORDER BY estimated_restore
-            LIMIT 10
-        """)
+            WHERE status IN ('PENDING', 'VERIFIED')
+              AND estimated_restore IS NOT NULL
+        """
+        params = []
+        if found_neighborhood:
+            query += " AND LOWER(neighborhood) LIKE %s"
+            params.append(f"%{found_neighborhood}%")
+
+        query += " ORDER BY estimated_restore ASC LIMIT 5"
+        cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
+
         prediction = get_historical_prediction(found_neighborhood or "Douala", cursor, lang=lang)
 
         if not rows:
@@ -329,7 +399,7 @@ def _rule_based_answer(question, context, cursor, lang="fr"):
             ans += "\n\n" + prediction
         return ans
 
-    # 4. Tips & Safety
+    # 6. Tips & Safety
     safety_kw = ["what should i do", "advice", "during a power", "tips", "safety", "que faire", "conseils", "sécurité", "securite", "appareil", "délestage", "delestage"]
     if any(w in question for w in safety_kw):
         if lang == "fr":
@@ -355,21 +425,21 @@ def _rule_based_answer(question, context, cursor, lang="fr"):
     # Default overview
     if lang == "fr":
         return (
-            "Je peux vous renseigner sur l'état des coupures d'électricité à Douala.\n\n"
+            "Je peux vous renseigner sur l'état des coupures d'électricité et des infrastructures vitales à Douala.\n\n"
             "Exemples de questions :\n"
+            "• L'Hôpital Laquintinie a-t-il du courant ?\n"
             "• Y a-t-il une coupure à Bonamoussadi ?\n"
-            "• Quels quartiers ont des coupures actuellement ?\n"
-            "• Quand le courant va-t-il revenir ?\n"
-            "• Que faire en cas de coupure de courant ?\n\n"
+            "• Quel est l'état de la station d'eau Camwater de Japoma ?\n"
+            "• Quand le courant va-t-il revenir ?\n\n"
             f"{context}"
         )
     return (
-        "I can help with questions about current outages in Douala.\n\n"
+        "I can help with questions about current outages and critical infrastructure in Douala.\n\n"
         "Try asking:\n"
+        "• Does Hospital Laquintinie have power?\n"
         "• Is there an outage in Bonamoussadi?\n"
-        "• Which areas currently have outages?\n"
-        "• When is electricity expected to return?\n"
-        "• What should I do during a power cut?\n\n"
+        "• What is the status of Camwater drinking water plant?\n"
+        "• When is electricity expected to return?\n\n"
         f"{context}"
     )
 
@@ -379,7 +449,7 @@ def _call_external_ai(question, context, lang="fr"):
     lang_instruction = "Answer in French by default." if lang == "fr" else "Answer in English."
     system_prompt = (
         f"You are a helpful assistant for Douala Power Alert, a community outage map "
-        f"for Douala, Cameroon. {lang_instruction} Answer only based on the provided outage data. "
+        f"for Douala, Cameroon. {lang_instruction} Answer only based on the provided outage and critical facility data. "
         f"NEVER invent restoration times. If no verified estimate exists, state that clearly: "
         f"'No verified restoration estimate is currently available.' or 'Aucune estimation vérifiée n\\'est actuellement disponible.' "
         f"Be concise and friendly."

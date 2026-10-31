@@ -41,6 +41,9 @@
                     <a href="{{ url_for('schedules') }}">
                         <span class="nav-icon">⚡</span> {{ t('nav_schedules') }}
                     </a>
+                    <a href="{{ url_for('infrastructure') }}">
+                        <span class="nav-icon">🏥</span> {{ t('nav_infrastructure') }}
+                    </a>
                     <a href="{{ url_for('analytics') }}">
                         <span class="nav-icon">📊</span> {{ t('nav_analytics') }}
                     </a>
@@ -159,6 +162,10 @@
                 <p>{{ t('tagline') }}</p>
             </div>
             <div style="margin-bottom: 12px; display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
+                <a href="{{ url_for('infrastructure') }}" style="color: #38bdf8; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                    🏥 Surveillance Hôpitaux & Eau Camwater
+                </a>
+                <span style="color: rgba(255,255,255,0.2);">•</span>
                 <a href="{{ url_for('offline') }}" style="color: #38bdf8; font-size: 0.88rem; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
                     📶 Mode Hors-Ligne & Numéros d'Urgence
                 </a>

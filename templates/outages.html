@@ -2,18 +2,18 @@
 {% block title %}{{ t('outages_title') }} — {{ t('app_name') }}{% endblock %}
 
 {% block content %}
-<div class="page-header" style="margin-bottom: 24px;">
+<div class="page-header" style="margin-bottom: 28px;">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
         <div>
-            <h1 style="margin: 0; font-size: 2rem; font-weight: 800; letter-spacing: -0.02em;">📍 {{ t('outages_title') }}</h1>
-            <p class="muted" style="margin: 2px 0 0; font-size: 0.96rem;">{{ t('outages_subtitle') }}</p>
+            <h1 style="margin: 0; font-size: 2.1rem; font-weight: 800; letter-spacing: -0.03em;">{{ t('outages_title') }}</h1>
+            <p class="muted" style="margin: 4px 0 0; font-size: 0.98rem;">{{ t('outages_subtitle') }}</p>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <a href="{{ url_for('schedules') }}" class="btn btn-sm btn-outline" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc;">
-                ⚡ {{ t('nav_schedules') }}
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ url_for('outages.infrastructure') }}" class="btn btn-outline" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;">
+                🏥 Hôpitaux & Eau Camwater
             </a>
-            <a href="{{ url_for('report') }}" class="btn btn-sm btn-primary" style="display: inline-flex; align-items: center; gap: 6px;">
-                ⚠️ {{ t('nav_report') }}
+            <a href="{{ url_for('outages.report') }}" class="btn btn-primary" style="box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);">
+                ⚠️ {{ t('btn_report_outage') }}
             </a>
         </div>
     </div>
@@ -29,6 +29,10 @@
         <option value="">Toutes les natures</option>
         <option value="SCHEDULED" {% if type_filter == 'SCHEDULED' %}selected{% endif %}>⚡ {{ t('badge_scheduled_short') }} (Eneo)</option>
         <option value="UNPLANNED" {% if type_filter == 'UNPLANNED' %}selected{% endif %}>⚠️ {{ t('badge_unplanned_short') }} (Panne)</option>
+    </select>
+    <select name="critical" class="search-select">
+        <option value="">Tous les secteurs</option>
+        <option value="1" {% if critical_filter == '1' %}selected{% endif %}>🚨 Zones Médicales / Eau</option>
     </select>
     <select name="status" class="search-select">
         <option value="">{{ t('all_statuses') }}</option>
@@ -53,7 +57,7 @@
         {% for o in outages %}
         <div class="outage-card" data-neighborhood="{{ o.neighborhood | lower }}"
              data-status="{{ o.status }}"
-             style="border-left-color: {% if o.status == 'VERIFIED' %}#ef4444{% elif o.status == 'PENDING' %}#f59e0b{% elif o.status == 'RESTORED' %}#10b981{% else %}#64748b{% endif %};">
+             style="border-left-color: {% if o.affects_critical %}#ef4444{% elif o.status == 'VERIFIED' %}#ef4444{% elif o.status == 'PENDING' %}#f59e0b{% elif o.status == 'RESTORED' %}#10b981{% else %}#64748b{% endif %};">
             <div class="outage-header">
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <span style="font-size: 1.15rem;">📍</span>
@@ -65,6 +69,11 @@
                     {% else %}
                         <span class="status-badge" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.35); font-size: 0.76rem;">
                             ⚠️ {{ t('badge_unplanned_short') }}
+                        </span>
+                    {% endif %}
+                    {% if o.affects_critical %}
+                        <span class="status-badge" style="background: rgba(239, 68, 68, 0.22); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.5); font-size: 0.76rem;" title="Impacte hôpital ou station d'eau">
+                            🚨 Zone Critique (Santé/Eau)
                         </span>
                     {% endif %}
                 </div>

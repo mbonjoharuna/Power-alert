@@ -1,7 +1,7 @@
 """
 API Blueprint for Douala Power Alert.
 Provides REST JSON endpoints for active neighborhood lookups, map markers,
-heatmap severity weights, and user notifications.
+heatmap severity weights, user notifications, and critical infrastructure telemetry.
 """
 
 from flask import Blueprint, request, jsonify, session
@@ -13,6 +13,10 @@ from services.notification_service import (
     get_user_notifications,
     get_unread_count,
     mark_as_read
+)
+from services.facility_service import (
+    get_all_facilities,
+    get_critical_facilities_kpis
 )
 
 api_bp = Blueprint("api", __name__)
@@ -34,7 +38,7 @@ DOUALA_COORDS = {
     "bonaberi": [4.0800, 9.6700],
     "pk 8": [4.0700, 9.7800],
     "pk 10": [4.0650, 9.8000],
-    "pk 12": [4.0600, 9.8200],
+    "pk 12": [4.060, 9.8200],
     "pk 14": [4.0550, 9.8400],
     "pk 17": [4.0500, 9.8700],
 }
@@ -69,26 +73,30 @@ def api_active_by_neighborhood():
                 "id": r["id"],
                 "neighborhood": r["neighborhood"],
                 "location": r["location"],
-                "status": r["status"],
                 "start_time": st,
-                "conf_count": r["conf_count"]
+                "status": r["status"],
+                "conf_count": r.get("conf_count", 0),
             })
+
         return jsonify({"found": True, "outages": outages_list})
-    except Exception:
+    except Error:
         return jsonify({"found": False, "outages": []})
 
 
 @api_bp.route("/api/analytics/heatmap")
 def api_analytics_heatmap():
-    """Return weighted coordinate points [lat, lng, intensity] for Leaflet Heatmap."""
+    """
+    Returns array of [lat, lng, intensity] data points for Leaflet.heat overlay.
+    Intensity is calculated from status and confirmations.
+    """
     try:
         with get_db_cursor() as cur:
             cur.execute("""
-                SELECT id, neighborhood, status, latitude, longitude,
+                SELECT o.id, o.neighborhood, o.location, o.status, o.latitude, o.longitude,
                        (SELECT COUNT(*) FROM confirmations c WHERE c.outage_id = o.id AND c.confirmation = 'STILL_OFF') AS conf_count
                 FROM outages o
-                WHERE status IN ('PENDING', 'VERIFIED', 'RESTORED')
-                ORDER BY created_at DESC
+                WHERE o.status IN ('PENDING', 'VERIFIED', 'RESTORED')
+                ORDER BY o.created_at DESC
                 LIMIT 200
             """)
             rows = cur.fetchall()
@@ -120,12 +128,12 @@ def api_analytics_heatmap():
 
 @api_bp.route("/api/outages/map")
 def api_map_outages():
-    """Return outages with exact coordinates or fallback center points, including planned/unplanned status."""
+    """Return outages with exact coordinates or fallback center points, including planned/unplanned status and critical impact."""
     try:
         with get_db_cursor() as cur:
             cur.execute("""
                 SELECT o.id, o.neighborhood, o.location, o.status, o.latitude, o.longitude,
-                       o.outage_type, s.title AS schedule_title
+                       o.outage_type, o.affects_critical, s.title AS schedule_title
                 FROM outages o
                 LEFT JOIN scheduled_outages s ON o.schedule_id = s.id
                 WHERE o.status IN ('PENDING', 'VERIFIED', 'RESTORED')
@@ -151,6 +159,7 @@ def api_map_outages():
                 "location": r["location"],
                 "status": r["status"],
                 "outage_type": r.get("outage_type") or "UNPLANNED",
+                "affects_critical": bool(r.get("affects_critical")),
                 "schedule_title": r.get("schedule_title") or "",
                 "lat": lat,
                 "lng": lng,
@@ -188,6 +197,43 @@ def api_active_schedules():
         return jsonify(result)
     except Exception:
         return jsonify([])
+
+
+@api_bp.route("/api/infrastructure")
+def api_infrastructure():
+    """Return critical facilities telemetry (hospitals, water plants, dialysis centers)."""
+    facility_type = request.args.get("type")
+    status = request.args.get("status")
+    neighborhood = request.args.get("neighborhood")
+
+    facilities = get_all_facilities(facility_type=facility_type, power_status=status, neighborhood=neighborhood)
+    output = []
+    for f in facilities:
+        output.append({
+            "id": f["id"],
+            "name": f["name"],
+            "facility_type": f["facility_type"],
+            "neighborhood": f["neighborhood"],
+            "address": f.get("address") or "",
+            "latitude": float(f["latitude"]) if f.get("latitude") is not None else None,
+            "longitude": float(f["longitude"]) if f.get("longitude") is not None else None,
+            "has_backup_generator": bool(f.get("has_backup_generator")),
+            "generator_capacity_kva": f.get("generator_capacity_kva"),
+            "fuel_autonomy_hours": float(f.get("fuel_autonomy_hours") or 0),
+            "current_power_status": f.get("current_power_status", "ON_GRID"),
+            "contact_name": f.get("contact_name") or "",
+            "contact_phone": f.get("contact_phone") or "",
+            "notes": f.get("notes") or "",
+            "last_status_change": str(f.get("last_status_change") or "")
+        })
+    return jsonify(output)
+
+
+@api_bp.route("/api/infrastructure/summary")
+def api_infrastructure_summary():
+    """Return summary KPI statistics for critical infrastructure."""
+    kpis = get_critical_facilities_kpis()
+    return jsonify(kpis)
 
 
 @api_bp.route("/api/notifications")

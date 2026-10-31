@@ -1,8 +1,8 @@
 """
 Outages Blueprint for Douala Power Alert.
-Handles citizen dashboard, outage reporting with GPS and Eneo schedule correlation,
-listings, confirmations, personal reports history, load-shedding severity analytics,
-and public Eneo scheduled maintenance calendar.
+Handles citizen dashboard, outage reporting with GPS, Eneo schedule correlation,
+critical infrastructure alerting, listings, confirmations, personal reports history,
+load-shedding severity analytics, and public critical facilities oversight.
 """
 
 from datetime import datetime
@@ -13,8 +13,19 @@ from extensions import limiter
 from database import get_db_cursor
 from translations import get_text
 from routes.utils import login_required, get_current_lang
-from services.notification_service import create_neighborhood_notification
+from services.notification_service import (
+    create_neighborhood_notification,
+    create_critical_infrastructure_alert
+)
 from services.schedule_service import find_matching_schedule, get_all_schedules
+from services.facility_service import (
+    get_all_facilities,
+    get_critical_facilities_kpis,
+    check_outage_critical_impact,
+    get_facilities_by_neighborhood,
+    update_facility_power_status,
+    sync_facilities_with_active_outages
+)
 
 outages_bp = Blueprint("outages", __name__)
 
@@ -88,7 +99,7 @@ def dashboard():
 @login_required
 @limiter.limit("10 per minute")
 def report():
-    """Report an outage with duplicate detection, GPS pin, and automatic Eneo schedule matching."""
+    """Report an outage with duplicate detection, GPS pin, Eneo schedule matching, and critical infrastructure alerting."""
     lang = get_current_lang()
     form_data = None
     existing = None
@@ -161,17 +172,26 @@ def report():
         schedule_id = matched_sched["id"] if matched_sched else None
         est_restore = matched_sched["end_time"] if matched_sched else None
 
+        # Check Critical Infrastructure impact (Hospitals, water stations, dialysis)
+        impacted_facs, is_critical = check_outage_critical_impact(neighborhood, lat=lat, lng=lng)
+
         try:
             with get_db_cursor(commit=True) as cur:
                 cur.execute(
                     """INSERT INTO outages
-                       (user_id, neighborhood, location, description, start_time, estimated_restore, status, latitude, longitude, outage_type, schedule_id)
-                       VALUES (%s, %s, %s, %s, %s, %s, 'PENDING', %s, %s, %s, %s)""",
-                    (session["user_id"], neighborhood, location, description, start_time, est_restore, lat, lng, outage_type, schedule_id),
+                       (user_id, neighborhood, location, description, start_time, estimated_restore, status, latitude, longitude, outage_type, schedule_id, affects_critical)
+                       VALUES (%s, %s, %s, %s, %s, %s, 'PENDING', %s, %s, %s, %s, %s)""",
+                    (session["user_id"], neighborhood, location, description, start_time, est_restore, lat, lng, outage_type, schedule_id, is_critical),
                 )
                 new_outage_id = cur.lastrowid
 
-            # Instant in-app notification to all residents of this neighborhood
+            # Update impacted facilities status to BACKUP_GENERATOR or CRITICAL_BLACKOUT
+            for fac in impacted_facs:
+                new_status = "BACKUP_GENERATOR" if fac.get("has_backup_generator") else "CRITICAL_BLACKOUT"
+                update_facility_power_status(fac["id"], new_status)
+                create_critical_infrastructure_alert(fac, new_outage_id, location=location)
+
+            # Standard neighborhood notification
             create_neighborhood_notification(
                 neighborhood=neighborhood,
                 outage_id=new_outage_id,
@@ -181,7 +201,11 @@ def report():
                 exclude_user_id=session["user_id"]
             )
 
-            if matched_sched:
+            # Informative message with scheduled maintenance or critical facility notes
+            if is_critical:
+                fac_names = ", ".join([f["name"] for f in impacted_facs[:2]])
+                flash(f"🚨 {get_text('msg_report_success', lang=lang)} — Zone critique détectée : {fac_names} basculé(s) sur alimentation de secours.", "warning")
+            elif matched_sched:
                 flash(f"⚡ {get_text('msg_report_success', lang=lang)} (Note : {get_text('badge_scheduled', lang=lang)} - {matched_sched['title']})", "info")
             else:
                 flash(get_text("msg_report_success", lang=lang), "success")
@@ -194,10 +218,11 @@ def report():
 
 @outages_bp.route("/outages")
 def outages():
-    """List public outages with search, status, and planned/unplanned filtering."""
+    """List public outages with search, status, planned/unplanned, and critical facility filtering."""
     search = request.args.get("q", "").strip()
     status_filter = request.args.get("status", "").strip()
     type_filter = request.args.get("type", "").strip()
+    critical_filter = request.args.get("critical", "").strip()
 
     try:
         sql = """
@@ -226,6 +251,9 @@ def outages():
             sql += " AND o.outage_type = %s"
             params.append(type_filter)
 
+        if critical_filter == "1":
+            sql += " AND o.affects_critical = TRUE"
+
         sql += " ORDER BY o.created_at DESC LIMIT 60"
 
         with get_db_cursor() as cur:
@@ -237,16 +265,17 @@ def outages():
             outages=rows,
             search=search,
             status_filter=status_filter,
-            type_filter=type_filter
+            type_filter=type_filter,
+            critical_filter=critical_filter
         )
     except Error:
         flash(get_text("msg_db_error", lang=get_current_lang()), "danger")
-        return render_template("outages.html", outages=[], search=search, status_filter=status_filter, type_filter=type_filter)
+        return render_template("outages.html", outages=[], search=search, status_filter=status_filter, type_filter=type_filter, critical_filter=critical_filter)
 
 
 @outages_bp.route("/outage/<int:outage_id>")
 def outage_details(outage_id):
-    """Detailed view for a single outage including confirmations, GPS pinpoint, and Eneo schedule correlation."""
+    """Detailed view for a single outage including confirmations, GPS pinpoint, Eneo schedule correlation, and critical facilities."""
     lang = get_current_lang()
     try:
         with get_db_cursor() as cur:
@@ -276,10 +305,19 @@ def outage_details(outage_id):
             flash(get_text("msg_outage_not_found", lang=lang), "danger")
             return redirect(url_for("outages.outages"))
 
+        # Look up critical facilities in this neighborhood or nearby
+        nearby_facs = []
+        if outage.get("latitude") and outage.get("longitude"):
+            impacted, _ = check_outage_critical_impact(outage["neighborhood"], outage["latitude"], outage["longitude"])
+            nearby_facs = impacted
+        else:
+            nearby_facs = get_facilities_by_neighborhood(outage["neighborhood"])
+
         return render_template(
             "outage_details.html",
             outage=outage,
             user_confirmed=user_confirmed,
+            nearby_facilities=nearby_facs,
         )
     except Error:
         flash(get_text("msg_db_error", lang=lang), "danger")
@@ -356,6 +394,7 @@ def confirm_outage(outage_id):
             )
             flash(get_text("msg_auto_verified_community", lang=lang, count=total_confs), "success")
         elif auto_restored:
+            sync_facilities_with_active_outages()
             create_neighborhood_notification(
                 neighborhood=outage["neighborhood"],
                 outage_id=outage_id,
@@ -365,18 +404,21 @@ def confirm_outage(outage_id):
             )
             flash(get_text("msg_auto_restored_community", lang=lang, count=total_confs), "success")
         else:
-            flash(get_text("msg_confirm_success", lang=lang), "success")
+            if confirmation == "STILL_OFF":
+                flash(get_text("msg_confirm_saved_off", lang=lang), "info")
+            else:
+                flash(get_text("msg_confirm_saved_restored", lang=lang), "info")
 
+        return redirect(url_for("outages.outage_details", outage_id=outage_id))
     except Error:
         flash(get_text("msg_db_error", lang=lang), "danger")
-
-    return redirect(url_for("outages.outage_details", outage_id=outage_id))
+        return redirect(url_for("outages.outage_details", outage_id=outage_id))
 
 
 @outages_bp.route("/my-reports")
 @login_required
 def my_reports():
-    """List of all outages reported by the current citizen."""
+    """User-specific submission history."""
     user_id = session["user_id"]
     try:
         with get_db_cursor() as cur:
@@ -412,12 +454,37 @@ def schedules():
     )
 
 
+@outages_bp.route("/infrastructure")
+def infrastructure():
+    """
+    Public Status Board for Critical Infrastructure in Douala:
+    Hospitals, ERs, Dialysis centers, Blood banks, and Camwater drinking water plants.
+    """
+    facility_type = request.args.get("type", "").strip()
+    status_filter = request.args.get("status", "").strip()
+
+    facilities_list = get_all_facilities(
+        facility_type=facility_type or None,
+        power_status=status_filter or None
+    )
+    kpis = get_critical_facilities_kpis()
+
+    return render_template(
+        "infrastructure.html",
+        facilities=facilities_list,
+        kpis=kpis,
+        selected_type=facility_type,
+        selected_status=status_filter
+    )
+
+
 @outages_bp.route("/analytics")
 def analytics():
     """
     Load-shedding & Outage analytics view:
     - Overall metrics and resolution rate
     - Planned vs Unplanned load-shedding breakdown
+    - Critical infrastructure impact indicators
     - Leaflet Heatmap of outage concentrations
     - Neighborhood severity impact ranking
     """
@@ -461,7 +528,7 @@ def analytics():
             dur_row = cur.fetchone()
             avg_duration_hours = round(float(dur_row["avg_duration_mins"]) / 60.0, 1) if dur_row and dur_row.get("avg_duration_mins") else 3.5
 
-            # 6. Neighborhood Severity Ranking with Planned counts
+            # 6. Neighborhood Severity Ranking with Planned & Critical counts
             cur.execute("""
                 SELECT 
                     neighborhood,
@@ -469,6 +536,7 @@ def analytics():
                     SUM(CASE WHEN status IN ('PENDING', 'VERIFIED') THEN 1 ELSE 0 END) AS active,
                     SUM(CASE WHEN status = 'RESTORED' THEN 1 ELSE 0 END) AS restored,
                     SUM(CASE WHEN outage_type = 'SCHEDULED' THEN 1 ELSE 0 END) AS planned,
+                    SUM(CASE WHEN affects_critical = TRUE THEN 1 ELSE 0 END) AS critical_count,
                     AVG(CASE 
                         WHEN status = 'RESTORED' AND updated_at > start_time 
                         THEN TIMESTAMPDIFF(MINUTE, start_time, updated_at)
@@ -491,12 +559,13 @@ def analytics():
             act = int(r["active"] or 0)
             res = int(r["restored"] or 0)
             pld = int(r["planned"] or 0)
+            crit = int(r.get("critical_count") or 0)
             avg_m = r.get("avg_duration_mins")
             avg_h = round(float(avg_m) / 60.0, 1) if avg_m else avg_duration_hours
             percent = int((tot / max_total) * 100) if max_total > 0 else 0
 
             # Severity tier
-            if act >= 2 or tot >= 6:
+            if act >= 2 or tot >= 6 or crit >= 1:
                 sev_key = "severity_critical"
                 sev_color = "#ef4444"
             elif act >= 1 or tot >= 3:
@@ -515,11 +584,14 @@ def analytics():
                 "active": act,
                 "restored": res,
                 "planned": pld,
+                "critical_count": crit,
                 "avg_duration": avg_h,
                 "percent": percent,
                 "severity_key": sev_key,
                 "severity_color": sev_color
             })
+
+        facilities_kpis = get_critical_facilities_kpis()
 
         return render_template(
             "analytics.html",
@@ -533,7 +605,8 @@ def analytics():
             resolution_rate=resolution_rate,
             avg_duration_hours=avg_duration_hours,
             most_affected=most_affected,
-            neighborhood_stats=neighborhood_stats
+            neighborhood_stats=neighborhood_stats,
+            facilities_kpis=facilities_kpis
         )
     except Exception:
         flash(get_text("msg_db_error", lang=lang), "danger")
@@ -549,5 +622,6 @@ def analytics():
             resolution_rate=0,
             avg_duration_hours=0,
             most_affected="—",
-            neighborhood_stats=[]
+            neighborhood_stats=[],
+            facilities_kpis={"total": 0, "on_grid": 0, "backup_generator": 0, "critical_blackout": 0}
         )
