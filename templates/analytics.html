@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}{{ t('analytics_title') }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📊 {{ t('analytics_title') }}</h1>
+    <p class="muted">{{ t('analytics_subtitle') }}</p>
+</div>
+
+<!-- 1. Top Metrics Grid -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-number">{{ total_outages }}</div>
+        <div class="stat-label">⚡ {{ t('th_total_outages') }}</div>
+    </div>
+    <div class="stat-card highlight">
+        <div class="stat-number">{{ active_outages }}</div>
+        <div class="stat-label">🔴 {{ t('th_active_outages') }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ resolution_rate }}%</div>
+        <div class="stat-label">🟢 {{ t('stat_resolution_rate') }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">{{ avg_duration_hours }}h</div>
+        <div class="stat-label">⏳ {{ t('stat_avg_duration') }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number" style="font-size: 1.5rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+            {{ most_affected }}
+        </div>
+        <div class="stat-label">🚨 {{ t('stat_most_affected') }}</div>
+    </div>
+</div>
+
+<!-- 2. Interactive Heatmap Section -->
+<section class="section" style="margin-top: 32px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; flex-wrap: wrap; gap: 12px;">
+        <div>
+            <h2 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 4px;">🔥 {{ t('heatmap_title') }}</h2>
+            <p class="muted" style="font-size: 0.9rem; margin-bottom: 0;">{{ t('heatmap_legend') }}</p>
+        </div>
+        <!-- Mode Switcher Buttons -->
+        <div class="heatmap-controls" style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" id="btnModeHeatmap" class="btn btn-sm btn-primary">
+                {{ t('btn_toggle_heatmap') }}
+            </button>
+            <button type="button" id="btnModeMarkers" class="btn btn-sm btn-outline">
+                {{ t('btn_toggle_markers') }}
+            </button>
+            <button type="button" id="btnModeBoth" class="btn btn-sm btn-outline">
+                {{ t('btn_toggle_both') }}
+            </button>
+        </div>
+    </div>
+
+    <div id="analyticsMap" style="height: 440px; width: 100%; border-radius: var(--radius-lg); border: 1.5px solid var(--border); box-shadow: var(--shadow-md); z-index: 1;"></div>
+</section>
+
+<!-- 3. Neighborhood Severity Ranking Table -->
+<section class="section" style="margin-top: 40px;">
+    <h2 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 16px;">📈 {{ t('ranking_title') }}</h2>
+
+    {% if neighborhood_stats %}
+    <div class="table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>{{ t('th_neighborhood') }}</th>
+                    <th style="min-width: 140px;">Impact</th>
+                    <th>{{ t('th_total_outages') }}</th>
+                    <th>{{ t('th_active_outages') }}</th>
+                    <th>{{ t('th_restored_outages') }}</th>
+                    <th>{{ t('th_avg_duration') }}</th>
+                    <th>{{ t('th_severity') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for n in neighborhood_stats %}
+                <tr>
+                    <td>
+                        <strong style="font-size: 1rem; color: var(--text);">{{ n.neighborhood }}</strong>
+                    </td>
+                    <td>
+                        <div style="background: #e2e8f0; border-radius: 9999px; height: 8px; width: 100%; overflow: hidden;">
+                            <div style="background: {{ n.severity_color }}; width: {{ n.percent }}%; height: 100%; border-radius: 9999px;"></div>
+                        </div>
+                    </td>
+                    <td><strong>{{ n.total }}</strong></td>
+                    <td>
+                        {% if n.active > 0 %}
+                            <span style="color: #ef4444; font-weight: 700;">🔴 {{ n.active }}</span>
+                        {% else %}
+                            <span class="muted">0</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if n.restored > 0 %}
+                            <span style="color: #10b981; font-weight: 600;">🟢 {{ n.restored }}</span>
+                        {% else %}
+                            <span class="muted">0</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ n.avg_duration }}h</td>
+                    <td>
+                        <span class="status-badge" style="background: {{ n.severity_color }}18; color: {{ n.severity_color }}; border: 1px solid {{ n.severity_color }}40;">
+                            ● {{ t(n.severity_key) }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="muted">{{ t('no_analytics_data') }}</p>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var mapEl = document.getElementById('analyticsMap');
+        if (!mapEl || typeof L === 'undefined') return;
+
+        // Initialize map on Douala
+        var map = L.map('analyticsMap', {
+            zoomControl: true,
+            scrollWheelZoom: false
+        }).setView([4.0511, 9.7679], 12);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap',
+            maxZoom: 18
+        }).addTo(map);
+
+        var markersGroup = L.layerGroup().addTo(map);
+        var heatGroup = L.layerGroup().addTo(map);
+
+        // 1. Fetch markers
+        fetch('/api/outages/map')
+            .then(function (res) { return res.json(); })
+            .then(function (markers) {
+                markers.forEach(function (m) {
+                    var color = m.status === 'RESTORED' ? '#10b981' : (m.status === 'PENDING' ? '#f59e0b' : '#ef4444');
+                    var iconHtml = '<div class="custom-marker-wrap">' +
+                        '<div class="marker-core" style="background:' + color + '; width:14px; height:14px;"></div>' +
+                    '</div>';
+
+                    var icon = L.divIcon({
+                        className: 'custom-leaflet-marker',
+                        html: iconHtml,
+                        iconSize: [16, 16],
+                        iconAnchor: [8, 8]
+                    });
+
+                    var marker = L.marker([m.lat, m.lng], { icon: icon });
+                    marker.bindPopup(
+                        '<div style="font-family: inherit;">' +
+                            '<strong>' + m.neighborhood + '</strong><br>' +
+                            '<span style="font-size: 0.85rem; color:#64748b;">' + m.location + '</span><br>' +
+                            '<span style="font-weight:700; font-size:0.85rem; color:' + color + ';">' + m.status + '</span>' +
+                        '</div>'
+                    );
+                    markersGroup.addLayer(marker);
+                });
+            });
+
+        // 2. Fetch Heatmap points
+        fetch('/api/analytics/heatmap')
+            .then(function (res) { return res.json(); })
+            .then(function (points) {
+                if (typeof L.heatLayer === 'function' && points.length > 0) {
+                    var heat = L.heatLayer(points, {
+                        radius: 30,
+                        blur: 20,
+                        maxZoom: 16,
+                        max: 1.0,
+                        gradient: {
+                            0.2: '#3b82f6',
+                            0.5: '#10b981',
+                            0.7: '#f59e0b',
+                            1.0: '#ef4444'
+                        }
+                    });
+                    heatGroup.addLayer(heat);
+                }
+            });
+
+        // 3. Layer Mode Buttons
+        var btnHeat = document.getElementById('btnModeHeatmap');
+        var btnMark = document.getElementById('btnModeMarkers');
+        var btnBoth = document.getElementById('btnModeBoth');
+
+        function setActiveButton(activeBtn) {
+            [btnHeat, btnMark, btnBoth].forEach(function (b) {
+                b.classList.remove('btn-primary');
+                b.classList.add('btn-outline');
+            });
+            activeBtn.classList.remove('btn-outline');
+            activeBtn.classList.add('btn-primary');
+        }
+
+        btnHeat.addEventListener('click', function () {
+            setActiveButton(btnHeat);
+            if (!map.hasLayer(heatGroup)) map.addLayer(heatGroup);
+            if (map.hasLayer(markersGroup)) map.removeLayer(markersGroup);
+        });
+
+        btnMark.addEventListener('click', function () {
+            setActiveButton(btnMark);
+            if (!map.hasLayer(markersGroup)) map.addLayer(markersGroup);
+            if (map.hasLayer(heatGroup)) map.removeLayer(heatGroup);
+        });
+
+        btnBoth.addEventListener('click', function () {
+            setActiveButton(btnBoth);
+            if (!map.hasLayer(heatGroup)) map.addLayer(heatGroup);
+            if (!map.hasLayer(markersGroup)) map.addLayer(markersGroup);
+        });
+    });
+</script>
+{% endblock %}

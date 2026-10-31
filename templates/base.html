@@ -28,6 +28,9 @@
                     <a href="{{ url_for('outages') }}">
                         <span class="nav-icon">📍</span> {{ t('nav_outages') }}
                     </a>
+                    <a href="{{ url_for('analytics') }}">
+                        <span class="nav-icon">📊</span> {{ t('nav_analytics') }}
+                    </a>
                     <a href="{{ url_for('ai_page') }}">
                         <span class="nav-icon">🤖</span> {{ t('nav_ai') }}
                     </a>
@@ -105,6 +108,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>

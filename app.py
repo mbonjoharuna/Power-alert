@@ -573,6 +573,125 @@ def ai_page():
 
 
 # ---------------------------------------------------------------------------
+# Analytics & Load-Shedding Severity View
+# ---------------------------------------------------------------------------
+
+@app.route("/analytics")
+def analytics():
+    lang = get_current_lang()
+    try:
+        with get_db_cursor() as cur:
+            # 1. Total outages
+            cur.execute("SELECT COUNT(*) AS c FROM outages")
+            total_outages = cur.fetchone()["c"]
+
+            # 2. Active outages
+            cur.execute("SELECT COUNT(*) AS c FROM outages WHERE status IN ('PENDING', 'VERIFIED')")
+            active_outages = cur.fetchone()["c"]
+
+            # 3. Restored outages
+            cur.execute("SELECT COUNT(*) AS c FROM outages WHERE status = 'RESTORED'")
+            restored_outages = cur.fetchone()["c"]
+
+            # Resolution rate
+            resolution_rate = round((restored_outages / total_outages * 100), 1) if total_outages > 0 else 100.0
+
+            # 4. Average duration across Douala (in hours)
+            cur.execute("""
+                SELECT AVG(CASE 
+                    WHEN status = 'RESTORED' AND updated_at > start_time 
+                    THEN TIMESTAMPDIFF(MINUTE, start_time, updated_at)
+                    WHEN estimated_restore IS NOT NULL AND estimated_restore > start_time 
+                    THEN TIMESTAMPDIFF(MINUTE, start_time, estimated_restore)
+                    ELSE NULL 
+                END) AS avg_duration_mins
+                FROM outages
+            """)
+            dur_row = cur.fetchone()
+            avg_duration_hours = round(float(dur_row["avg_duration_mins"]) / 60.0, 1) if dur_row and dur_row.get("avg_duration_mins") else 3.5
+
+            # 5. Neighborhood Severity Ranking
+            cur.execute("""
+                SELECT 
+                    neighborhood,
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN status IN ('PENDING', 'VERIFIED') THEN 1 ELSE 0 END) AS active,
+                    SUM(CASE WHEN status = 'RESTORED' THEN 1 ELSE 0 END) AS restored,
+                    AVG(CASE 
+                        WHEN status = 'RESTORED' AND updated_at > start_time 
+                        THEN TIMESTAMPDIFF(MINUTE, start_time, updated_at)
+                        WHEN estimated_restore IS NOT NULL AND estimated_restore > start_time 
+                        THEN TIMESTAMPDIFF(MINUTE, start_time, estimated_restore)
+                        ELSE NULL 
+                    END) AS avg_duration_mins
+                FROM outages
+                GROUP BY neighborhood
+                ORDER BY active DESC, total DESC
+            """)
+            ranking_rows = cur.fetchall()
+
+        most_affected = ranking_rows[0]["neighborhood"] if ranking_rows else "—"
+        max_total = max([r["total"] for r in ranking_rows]) if ranking_rows else 1
+
+        neighborhood_stats = []
+        for r in ranking_rows:
+            tot = r["total"]
+            act = int(r["active"] or 0)
+            res = int(r["restored"] or 0)
+            avg_m = r.get("avg_duration_mins")
+            avg_h = round(float(avg_m) / 60.0, 1) if avg_m else avg_duration_hours
+            percent = int((tot / max_total) * 100) if max_total > 0 else 0
+
+            # Severity tier
+            if act >= 2 or tot >= 6:
+                sev_key = "severity_critical"
+                sev_color = "#ef4444"
+            elif act >= 1 or tot >= 3:
+                sev_key = "severity_high"
+                sev_color = "#f97316"
+            elif tot >= 1:
+                sev_key = "severity_moderate"
+                sev_color = "#f59e0b"
+            else:
+                sev_key = "severity_low"
+                sev_color = "#10b981"
+
+            neighborhood_stats.append({
+                "neighborhood": r["neighborhood"],
+                "total": tot,
+                "active": act,
+                "restored": res,
+                "avg_duration": avg_h,
+                "percent": percent,
+                "severity_key": sev_key,
+                "severity_color": sev_color
+            })
+
+        return render_template(
+            "analytics.html",
+            total_outages=total_outages,
+            active_outages=active_outages,
+            restored_outages=restored_outages,
+            resolution_rate=resolution_rate,
+            avg_duration_hours=avg_duration_hours,
+            most_affected=most_affected,
+            neighborhood_stats=neighborhood_stats
+        )
+    except Exception:
+        flash(get_text("msg_db_error", lang=lang), "danger")
+        return render_template(
+            "analytics.html",
+            total_outages=0,
+            active_outages=0,
+            restored_outages=0,
+            resolution_rate=0,
+            avg_duration_hours=0,
+            most_affected="—",
+            neighborhood_stats=[]
+        )
+
+
+# ---------------------------------------------------------------------------
 # Admin routes
 # ---------------------------------------------------------------------------
 
@@ -800,6 +919,68 @@ def api_active_by_neighborhood():
         return jsonify({"found": True, "outages": outages_list})
     except Exception:
         return jsonify({"found": False, "outages": []})
+
+
+@app.route("/api/analytics/heatmap")
+def api_analytics_heatmap():
+    """Return weighted coordinate points [lat, lng, intensity] for Leaflet Heatmap."""
+    try:
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT id, neighborhood, status, latitude, longitude,
+                       (SELECT COUNT(*) FROM confirmations c WHERE c.outage_id = o.id AND c.confirmation = 'STILL_OFF') AS conf_count
+                FROM outages o
+                WHERE status IN ('PENDING', 'VERIFIED', 'RESTORED')
+                ORDER BY created_at DESC
+                LIMIT 200
+            """)
+            rows = cur.fetchall()
+
+        coords = {
+            "bonamoussadi": [4.0850, 9.7400],
+            "deido": [4.0600, 9.7200],
+            "akwa": [4.0500, 9.7000],
+            "bonanjo": [4.0400, 9.6900],
+            "bali": [4.0450, 9.7050],
+            "new bell": [4.0300, 9.7100],
+            "bassa": [4.0200, 9.7500],
+            "logbaba": [4.0100, 9.7600],
+            "makepe": [4.0900, 9.7300],
+            "kotto": [4.1000, 9.7500],
+            "ndokoti": [4.0550, 9.7450],
+            "yassa": [4.0000, 9.7800],
+            "bonapriso": [4.0350, 9.6950],
+            "bonaberi": [4.0800, 9.6700],
+            "pk 8": [4.0700, 9.7800],
+            "pk 10": [4.0650, 9.8000],
+            "pk 12": [4.0600, 9.8200],
+            "pk 14": [4.0550, 9.8400],
+            "pk 17": [4.0500, 9.8700],
+        }
+
+        heat_points = []
+        for r in rows:
+            key = r["neighborhood"].lower().strip()
+            if r.get("latitude") is not None and r.get("longitude") is not None:
+                lat = float(r["latitude"])
+                lng = float(r["longitude"])
+            else:
+                latlng = coords.get(key, [4.0511, 9.7679])
+                lat, lng = latlng[0], latlng[1]
+
+            conf = r.get("conf_count", 0) or 0
+            if r["status"] == "VERIFIED":
+                intensity = min(1.0, 0.75 + (conf * 0.08))
+            elif r["status"] == "PENDING":
+                intensity = min(0.7, 0.45 + (conf * 0.05))
+            else:
+                intensity = 0.25
+
+            heat_points.append([lat, lng, round(intensity, 2)])
+
+        return jsonify(heat_points)
+    except Exception:
+        return jsonify([])
 
 
 @app.route("/api/outages/map")
