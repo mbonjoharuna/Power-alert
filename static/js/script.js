@@ -53,8 +53,29 @@ document.addEventListener("DOMContentLoaded", function () {
     var toggle = document.getElementById("menuToggle");
     var links = document.querySelector(".nav-links");
     if (toggle && links) {
-        toggle.addEventListener("click", function () {
-            links.classList.toggle("open");
+        toggle.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var isOpen = links.classList.toggle("open");
+            toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+            toggle.textContent = isOpen ? "✕" : "☰";
+        });
+
+        // Close mobile drawer when clicking outside
+        document.addEventListener("click", function (e) {
+            if (links.classList.contains("open") && !links.contains(e.target) && e.target !== toggle) {
+                links.classList.remove("open");
+                toggle.setAttribute("aria-expanded", "false");
+                toggle.textContent = "☰";
+            }
+        });
+
+        // Close mobile drawer when any link inside is clicked
+        links.querySelectorAll("a").forEach(function (link) {
+            link.addEventListener("click", function () {
+                links.classList.remove("open");
+                toggle.setAttribute("aria-expanded", "false");
+                toggle.textContent = "☰";
+            });
         });
     }
 
