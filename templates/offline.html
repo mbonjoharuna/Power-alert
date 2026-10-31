@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% block title %}{{ t('offline_title') }} — {{ t('app_name') }}{% endblock %}
+
+{% block content %}
+<div class="page-header" style="margin-bottom: 24px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 52px; height: 52px; border-radius: var(--radius-md); background: rgba(245, 158, 11, 0.16); border: 1px solid rgba(245, 158, 11, 0.35); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; box-shadow: 0 0 18px rgba(245, 158, 11, 0.25);">
+                📶
+            </div>
+            <div>
+                <h1 style="margin: 0; font-size: 2.1rem; font-weight: 800; letter-spacing: -0.03em;">{{ t('offline_title') }}</h1>
+                <p class="muted" style="margin: 2px 0 0; font-size: 1.02rem;">{{ t('offline_subtitle') }}</p>
+            </div>
+        </div>
+        <div>
+            <span class="status-badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45); box-shadow: 0 0 14px rgba(245, 158, 11, 0.25); font-size: 0.88rem; padding: 6px 14px;">
+                {{ t('offline_badge') }}
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Offline Connection Notice -->
+<div style="margin-bottom: 28px; padding: 18px 22px; border-radius: var(--radius-lg); background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 1.8rem; line-height: 1;">💡</span>
+        <div style="font-size: 0.94rem; color: #fde68a; line-height: 1.5;">
+            Lorsque le courant est coupé, les antennes cellulaires à Douala perdent souvent leur signal. Vos données de coupure récentes et les contacts de dépannage restent disponibles ici en permanence.
+        </div>
+    </div>
+    <button type="button" id="btnRetryConnection" class="btn btn-sm btn-primary" style="white-space: nowrap; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);">
+        {{ t('offline_retry_btn') }}
+    </button>
+</div>
+
+<!-- 1. Cached Outages Section -->
+<section class="section" style="margin-bottom: 40px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <h2 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; margin: 0; letter-spacing: -0.01em;">
+            📋 {{ t('offline_cached_title') }}
+        </h2>
+        <span id="offlineCacheTimestamp" class="muted" style="font-size: 0.85rem;"></span>
+    </div>
+
+    <div id="offlineOutagesList" class="outage-list">
+        <div style="background: var(--bg-card); padding: 32px; border-radius: var(--radius-lg); text-align: center; border: 1px solid var(--border-glass);">
+            <div class="muted">{{ t('offline_cached_empty') }}</div>
+        </div>
+    </div>
+</section>
+
+<!-- 2. Douala Emergency & Utilities Directory -->
+<section class="section" style="margin-bottom: 40px;">
+    <h2 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; margin-bottom: 18px; letter-spacing: -0.01em;">
+        🚨 {{ t('offline_emergency_title') }}
+    </h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px;">
+        <!-- Eneo Dépannage -->
+        <div class="stat-card" style="border-top: 3px solid #38bdf8; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                    <span style="font-size: 1.5rem;">⚡</span>
+                    <strong style="color: #f8fafc; font-size: 1.1rem;">Eneo Cameroun Dépannage</strong>
+                </div>
+                <p class="muted" style="font-size: 0.88rem; margin-bottom: 14px;">Signalement d'incidents réseau, transformateurs en panne, poteaux tombés.</p>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="tel:8010" class="btn btn-sm btn-primary" style="flex: 1; text-align: center;">📞 8010 (Gratuit)</a>
+                <a href="tel:+237233425353" class="btn btn-sm btn-outline" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">📞 233 42 53 53</a>
+            </div>
+        </div>
+
+        <!-- Sapeurs-Pompiers -->
+        <div class="stat-card" style="border-top: 3px solid #ef4444; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                    <span style="font-size: 1.5rem;">🚒</span>
+                    <strong style="color: #f8fafc; font-size: 1.1rem;">Sapeurs-Pompiers (20e Groupement)</strong>
+                </div>
+                <p class="muted" style="font-size: 0.88rem; margin-bottom: 14px;">Incendies électriques, câbles sous tension au sol, secours immédiats.</p>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="tel:118" class="btn btn-sm btn-danger" style="flex: 1; text-align: center; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);">📞 118 (Urgence)</a>
+                <a href="tel:+237233422222" class="btn btn-sm btn-outline" style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;">📞 233 42 22 22</a>
+            </div>
+        </div>
+
+        <!-- Police Secours -->
+        <div class="stat-card" style="border-top: 3px solid #6366f1; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                    <span style="font-size: 1.5rem;">👮</span>
+                    <strong style="color: #f8fafc; font-size: 1.1rem;">Police Secours & Gendarmerie</strong>
+                </div>
+                <p class="muted" style="font-size: 0.88rem; margin-bottom: 14px;">Sécurisation des quartiers plongés dans l'obscurité et urgences publiques.</p>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="tel:117" class="btn btn-sm btn-primary" style="background: #4f46e5; border-color: #6366f1; flex: 1; text-align: center;">📞 117 (Police)</a>
+                <a href="tel:113" class="btn btn-sm btn-outline" style="border-color: rgba(99, 102, 241, 0.4); color: #a5b4fc;">📞 113 (Gendarmerie)</a>
+            </div>
+        </div>
+
+        <!-- Hôpitaux Référence Douala -->
+        <div class="stat-card" style="border-top: 3px solid #10b981; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                    <span style="font-size: 1.5rem;">🏥</span>
+                    <strong style="color: #f8fafc; font-size: 1.1rem;">Urgences Médicales & Hôpitaux</strong>
+                </div>
+                <p class="muted" style="font-size: 0.88rem; margin-bottom: 14px;">Hôpital Général de Douala & Hôpital Laquintinie (Douala 1er).</p>
+            </div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="tel:+237233370140" class="btn btn-sm btn-outline" style="border-color: rgba(16, 185, 129, 0.4); color: #6ee7b7; flex: 1; text-align: center;">🏥 Hôpital Général</a>
+                <a href="tel:+237233421540" class="btn btn-sm btn-outline" style="border-color: rgba(16, 185, 129, 0.4); color: #6ee7b7; flex: 1; text-align: center;">🏥 Laquintinie</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 3. Safety Tips During Blackouts -->
+<section class="section" style="margin-bottom: 44px;">
+    <h2 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc; margin-bottom: 18px; letter-spacing: -0.01em;">
+        🛡️ {{ t('offline_safety_title') }}
+    </h2>
+    <div class="feature-grid">
+        <div class="feature-card">
+            <div class="feature-icon-wrap" style="background: rgba(239, 68, 68, 0.16); border-color: rgba(239, 68, 68, 0.35);">
+                🔌
+            </div>
+            <h3 style="font-size: 1.1rem;">Surtensions de Rétablissement</h3>
+            <p>Débranchez immédiatement vos téléviseurs, ordinateurs et congélateurs. Lorsque le courant revient, les pics de tension peuvent griller les compresseurs et composants électroniques.</p>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-icon-wrap" style="background: rgba(56, 189, 248, 0.16); border-color: rgba(56, 189, 248, 0.35);">
+                🧊
+            </div>
+            <h3 style="font-size: 1.1rem;">Chaîne du Froid</h3>
+            <p>Gardez les portes du réfrigérateur et du congélateur fermées. Un congélateur fermé conserve les aliments congelés pendant 24 à 48 heures sans électricité.</p>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-icon-wrap" style="background: rgba(245, 158, 11, 0.16); border-color: rgba(245, 158, 11, 0.35);">
+                🔦
+            </div>
+            <h3 style="font-size: 1.1rem;">Éclairage Sans Danger</h3>
+            <p>Privilégiez les lampes torches et torches de smartphone. Évitez les bougies non surveillées près des rideaux ou en bois pour prévenir tout début d'incendie domestique.</p>
+        </div>
+
+        <div class="feature-card">
+            <div class="feature-icon-wrap" style="background: rgba(16, 185, 129, 0.16); border-color: rgba(16, 185, 129, 0.35);">
+                🔋
+            </div>
+            <h3 style="font-size: 1.1rem;">Économie d'Énergie Mobile</h3>
+            <p>Activez le mode Ultra Économie d'Énergie sur votre téléphone, réduisez la luminosité de l'écran et coupez le Bluetooth/GPS pour préserver l'accès aux appels d'urgence.</p>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // 1. Render Cached Outages from LocalStorage
+        var listContainer = document.getElementById('offlineOutagesList');
+        var timeContainer = document.getElementById('offlineCacheTimestamp');
+
+        try {
+            var rawData = localStorage.getItem('douala_cached_outages');
+            var rawTime = localStorage.getItem('douala_cached_timestamp');
+
+            if (rawTime && timeContainer) {
+                var dt = new Date(rawTime);
+                timeContainer.textContent = 'Dernière mise à jour : ' + dt.toLocaleTimeString() + ' (' + dt.toLocaleDateString() + ')';
+            }
+
+            if (rawData && listContainer) {
+                var outages = JSON.parse(rawData);
+                if (outages && outages.length > 0) {
+                    var html = '';
+                    outages.forEach(function (o) {
+                        var statusClass = (o.status || 'PENDING').toLowerCase();
+                        var statusLabel = o.status === 'RESTORED' ? '🟢 RÉTABLI' : (o.status === 'PENDING' ? '🟡 EN ATTENTE' : '🔴 COUPÉ');
+                        var borderColor = o.status === 'RESTORED' ? '#10b981' : (o.status === 'PENDING' ? '#f59e0b' : '#ef4444');
+
+                        html += '<div class="outage-card" style="border-left-color: ' + borderColor + ';">' +
+                            '<div class="outage-header">' +
+                                '<strong style="color: #f8fafc; font-size: 1.15rem;">📍 ' + (o.neighborhood || '').toUpperCase() + '</strong>' +
+                                '<span class="status-badge status-' + statusClass + '">' + statusLabel + '</span>' +
+                            '</div>' +
+                            '<p style="font-size: 0.98rem; margin-bottom: 6px; color: #cbd5e1;">' +
+                                '<strong>Lieu :</strong> ' + (o.location || '—') +
+                            '</p>' +
+                            (o.description ? '<p class="muted" style="margin-bottom: 8px;">' + o.description + '</p>' : '') +
+                            '<div class="outage-meta" style="margin-top: 8px;">' +
+                                (o.start_time ? '<span>🕒 Début : ' + o.start_time + '</span>' : '') +
+                                (o.estimated_restore ? '<span> · ⏳ Est. Rétablissement : <strong style="color: #fbbf24;">' + o.estimated_restore + '</strong></span>' : '') +
+                            '</div>' +
+                        '</div>';
+                    });
+                    listContainer.innerHTML = html;
+                }
+            }
+        } catch (e) {}
+
+        // 2. Retry Connection button
+        var btnRetry = document.getElementById('btnRetryConnection');
+        if (btnRetry) {
+            btnRetry.addEventListener('click', function () {
+                btnRetry.disabled = true;
+                btnRetry.textContent = '⏳ Test du réseau...';
+
+                fetch('/api/outages/map?t=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+                    .then(function (res) {
+                        btnRetry.textContent = '🟢 En ligne ! Redirection...';
+                        btnRetry.style.background = '#10b981';
+                        setTimeout(function () {
+                            window.location.href = '/outages';
+                        }, 800);
+                    })
+                    .catch(function () {
+                        btnRetry.disabled = false;
+                        btnRetry.textContent = '❌ Toujours hors-ligne';
+                        btnRetry.style.background = '#ef4444';
+                        setTimeout(function () {
+                            btnRetry.textContent = '{{ t("offline_retry_btn") }}';
+                            btnRetry.style.background = '';
+                        }, 2500);
+                    });
+            });
+        }
+
+        // 3. Auto-detect when network comes back online
+        window.addEventListener('online', function () {
+            var banner = document.createElement('div');
+            banner.style.cssText = 'position: fixed; top: 76px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 12px 24px; border-radius: 9999px; font-weight: 800; font-size: 0.95rem; z-index: 9999; box-shadow: 0 10px 30px rgba(0,0,0,0.5);';
+            banner.textContent = '{{ t("offline_online_banner") }}';
+            document.body.appendChild(banner);
+            setTimeout(function () {
+                window.location.reload();
+            }, 1200);
+        });
+    });
+</script>
+{% endblock %}

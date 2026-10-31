@@ -1,6 +1,8 @@
 /**
  * Douala Power Alert — client-side JS
- * Bilingual form validation (French default & English), mobile menu, Leaflet map markers with radar pulses, password toggles
+ * Bilingual form validation (French default & English), mobile menu,
+ * Leaflet map markers with radar pulses, password toggles,
+ * PWA installation banner, offline fallback caching & notifications.
  */
 
 function getLang() {
@@ -19,7 +21,9 @@ var JS_TEXTS = {
         statusOff: "🔴 COUPÉ",
         statusRestored: "🟢 RÉTABLI",
         statusPending: "🟡 EN ATTENTE",
-        details: "Voir les détails →"
+        details: "Voir les détails →",
+        offlinePill: "📶 Mode Hors-Ligne · Urgences",
+        cachedNotice: "Données locales en cache"
     },
     en: {
         fillAllFields: "Please fill in all required fields.",
@@ -32,7 +36,9 @@ var JS_TEXTS = {
         statusOff: "🔴 OFF",
         statusRestored: "🟢 RESTORED",
         statusPending: "🟡 PENDING",
-        details: "View details →"
+        details: "View details →",
+        offlinePill: "📶 Offline Mode · Utilities",
+        cachedNotice: "Locally cached data"
     }
 };
 
@@ -42,7 +48,7 @@ function t_js(key) {
     return dict[key] || (JS_TEXTS["fr"][key] || key);
 }
 
-// ---------- Mobile menu & Password Toggles ----------
+// ---------- Mobile menu, Password Toggles & PWA Init ----------
 document.addEventListener("DOMContentLoaded", function () {
     var toggle = document.getElementById("menuToggle");
     var links = document.querySelector(".nav-links");
@@ -60,6 +66,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // In-app & Web Push Notification Center
     setupNotifications();
+
+    // PWA In-App Install Prompt Banner
+    setupPwa();
+
+    // Network connectivity detection
+    setupOfflineDetection();
 });
 
 function setupPasswordToggles() {
@@ -149,7 +161,7 @@ function confirmAction(form) {
     return true;
 }
 
-// ---------- Interactive map (Leaflet with Radar Markers) ----------
+// ---------- Interactive map (Leaflet with Radar Markers & Offline Cache Fallback) ----------
 function initOutageMap(elementId) {
     var el = document.getElementById(elementId);
     if (!el || typeof L === "undefined") return;
@@ -165,64 +177,83 @@ function initOutageMap(elementId) {
         maxZoom: 18,
     }).addTo(map);
 
-    // Fetch markers from our API
+    function renderMarkers(markers) {
+        markers.forEach(function (m) {
+            var color = "#ef4444"; // red = off
+            var pulseColor = "rgba(239, 68, 68, 0.45)";
+            var label = t_js("statusOff");
+            var showPulse = true;
+
+            if (m.status === "RESTORED") {
+                color = "#10b981";
+                pulseColor = "transparent";
+                label = t_js("statusRestored");
+                showPulse = false;
+            } else if (m.status === "PENDING") {
+                color = "#f59e0b";
+                pulseColor = "rgba(245, 158, 11, 0.4)";
+                label = t_js("statusPending");
+            }
+
+            var pulseHtml = showPulse ? '<div class="marker-pulse" style="background:' + pulseColor + '"></div>' : '';
+            var iconHtml = '<div class="custom-marker-wrap">' +
+                            pulseHtml +
+                            '<div class="marker-core" style="background:' + color + '"></div>' +
+                           '</div>';
+
+            var icon = L.divIcon({
+                className: "custom-leaflet-marker",
+                html: iconHtml,
+                iconSize: [20, 20],
+                iconAnchor: [10, 10],
+                popupAnchor: [0, -10]
+            });
+
+            var marker = L.marker([m.lat, m.lng], { icon: icon }).addTo(map);
+            marker.bindPopup(
+                '<div style="font-family: inherit;">' +
+                    '<div style="font-size:1rem; font-weight:800; color:#f8fafc; margin-bottom:4px;">' +
+                        m.neighborhood +
+                    '</div>' +
+                    '<div style="color:#94a3b8; font-size:0.85rem; margin-bottom:8px;">' +
+                        m.location +
+                    '</div>' +
+                    '<div style="font-weight:700; font-size:0.85rem; margin-bottom:8px;">' +
+                        label +
+                    '</div>' +
+                    '<a href="/outage/' + m.id + '" style="color:#38bdf8; font-weight:700; text-decoration:none; font-size:0.85rem;">' +
+                        t_js("details") +
+                    '</a>' +
+                '</div>'
+            );
+        });
+    }
+
+    // Fetch markers from API, with localStorage cache fallback
     fetch("/api/outages/map")
         .then(function (res) {
             return res.json();
         })
         .then(function (markers) {
-            markers.forEach(function (m) {
-                var color = "#ef4444"; // red = off
-                var pulseColor = "rgba(239, 68, 68, 0.45)";
-                var label = t_js("statusOff");
-                var showPulse = true;
+            // Save to localStorage for offline viewing
+            try {
+                localStorage.setItem("douala_cached_outages", JSON.stringify(markers));
+                localStorage.setItem("douala_cached_timestamp", new Date().toISOString());
+            } catch (err) {}
 
-                if (m.status === "RESTORED") {
-                    color = "#10b981";
-                    pulseColor = "transparent";
-                    label = t_js("statusRestored");
-                    showPulse = false;
-                } else if (m.status === "PENDING") {
-                    color = "#f59e0b";
-                    pulseColor = "rgba(245, 158, 11, 0.4)";
-                    label = t_js("statusPending");
-                }
-
-                var pulseHtml = showPulse ? '<div class="marker-pulse" style="background:' + pulseColor + '"></div>' : '';
-                var iconHtml = '<div class="custom-marker-wrap">' +
-                                pulseHtml +
-                                '<div class="marker-core" style="background:' + color + '"></div>' +
-                               '</div>';
-
-                var icon = L.divIcon({
-                    className: "custom-leaflet-marker",
-                    html: iconHtml,
-                    iconSize: [20, 20],
-                    iconAnchor: [10, 10],
-                    popupAnchor: [0, -10]
-                });
-
-                var marker = L.marker([m.lat, m.lng], { icon: icon }).addTo(map);
-                marker.bindPopup(
-                    '<div style="font-family: inherit;">' +
-                        '<div style="font-size:1rem; font-weight:800; color:#f8fafc; margin-bottom:4px;">' +
-                            m.neighborhood +
-                        '</div>' +
-                        '<div style="color:#94a3b8; font-size:0.85rem; margin-bottom:8px;">' +
-                            m.location +
-                        '</div>' +
-                        '<div style="font-weight:700; font-size:0.85rem; margin-bottom:8px;">' +
-                            label +
-                        '</div>' +
-                        '<a href="/outage/' + m.id + '" style="color:#38bdf8; font-weight:700; text-decoration:none; font-size:0.85rem;">' +
-                            t_js("details") +
-                        '</a>' +
-                    '</div>'
-                );
-            });
+            renderMarkers(markers);
         })
         .catch(function () {
-            // Silent fail – map still shows base tiles
+            // Fallback: load from cache if offline
+            try {
+                var cached = localStorage.getItem("douala_cached_outages");
+                if (cached) {
+                    var parsed = JSON.parse(cached);
+                    if (parsed && parsed.length > 0) {
+                        renderMarkers(parsed);
+                    }
+                }
+            } catch (e) {}
         });
 }
 
@@ -307,7 +338,7 @@ function setupNotifications() {
         var title = notif.title || "Douala Power Alert";
         var options = {
             body: notif.message,
-            icon: "/static/img/icon-bolt.svg",
+            icon: "/static/img/icon-192.png",
             badge: "/static/img/icon-bolt.svg",
             data: { url: notif.outage_id ? "/outage/" + notif.outage_id : "/outages" }
         };
@@ -444,5 +475,84 @@ function setupNotifications() {
     }
 }
 
+// ===========================================================================
+// Progressive Web App (PWA) Install Prompt
+// ===========================================================================
 
+var deferredInstallPrompt = null;
 
+window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+
+    // Check if dismissed within the past 24 hours
+    var dismissedAt = localStorage.getItem("douala_pwa_dismissed");
+    if (dismissedAt && (Date.now() - parseInt(dismissedAt, 10) < 86400000)) {
+        return;
+    }
+
+    var banner = document.getElementById("pwaInstallBanner");
+    if (banner) {
+        banner.style.display = "block";
+    }
+});
+
+function setupPwa() {
+    var btnInstall = document.getElementById("btnPwaInstall");
+    var btnDismiss = document.getElementById("btnPwaDismiss");
+    var banner = document.getElementById("pwaInstallBanner");
+
+    if (btnInstall) {
+        btnInstall.addEventListener("click", function () {
+            if (deferredInstallPrompt) {
+                deferredInstallPrompt.prompt();
+                deferredInstallPrompt.userChoice.then(function (choice) {
+                    if (choice.outcome === "accepted") {
+                        if (banner) banner.style.display = "none";
+                    }
+                    deferredInstallPrompt = null;
+                });
+            }
+        });
+    }
+
+    if (btnDismiss) {
+        btnDismiss.addEventListener("click", function () {
+            if (banner) banner.style.display = "none";
+            localStorage.setItem("douala_pwa_dismissed", Date.now().toString());
+        });
+    }
+
+    window.addEventListener("appinstalled", function () {
+        if (banner) banner.style.display = "none";
+        deferredInstallPrompt = null;
+    });
+}
+
+// ===========================================================================
+// Offline Connectivity Detection
+// ===========================================================================
+
+function setupOfflineDetection() {
+    function updateOnlineStatus() {
+        var existingPill = document.getElementById("offlineStatusPill");
+        if (!navigator.onLine) {
+            if (!existingPill) {
+                var pill = document.createElement("a");
+                pill.id = "offlineStatusPill";
+                pill.href = "/offline";
+                pill.style.cssText = "position:fixed; bottom:20px; right:20px; background:rgba(239,68,68,0.92); backdrop-filter:blur(10px); color:white; padding:9px 18px; border-radius:9999px; font-weight:800; font-size:0.84rem; z-index:9998; box-shadow:0 8px 24px rgba(0,0,0,0.6); display:inline-flex; align-items:center; gap:8px; text-decoration:none; border:1px solid rgba(255,255,255,0.2);";
+                pill.innerHTML = '<span>📶</span> ' + t_js("offlinePill");
+                document.body.appendChild(pill);
+            }
+        } else {
+            if (existingPill) {
+                existingPill.remove();
+            }
+        }
+    }
+
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
+    updateOnlineStatus();
+}
