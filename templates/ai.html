@@ -9,6 +9,7 @@
 
 <div class="ai-box">
     <form method="POST" action="{{ url_for('ai_page') }}" id="aiForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label for="question">💬 {{ t('label_your_question') }}</label>
             <textarea id="question" name="question" rows="3" required

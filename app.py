@@ -2,6 +2,7 @@
 Douala Power Alert
 A participatory map and alert system of electricity outages in Douala.
 School coding challenge – simple, elegant, bilingual (French default & English).
+Enhanced with Connection Pooling, CSRF Protection, and Rate Limiting.
 """
 
 import os
@@ -14,16 +15,61 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
-import mysql.connector
 from mysql.connector import Error
 
+from flask_wtf.csrf import CSRFProtect, CSRFError
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+from database import (
+    get_db, get_cursor, get_db_cursor, init_db, ensure_admin
+)
 from services.ai_service import ask_ai
 from translations import get_text
 
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "douala-power-alert-prod-secret-2026")
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+# Initialize CSRF Protection
+csrf = CSRFProtect(app)
+
+# Initialize Rate Limiter
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["300 per hour", "60 per minute"],
+    storage_uri="memory://",
+)
+
+
+# ---------------------------------------------------------------------------
+# Error Handlers
+# ---------------------------------------------------------------------------
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    """Handle rate limit exceeded with localized message."""
+    lang = get_current_lang()
+    flash(get_text("msg_rate_limit_exceeded", lang=lang), "danger")
+    referrer = request.referrer
+    if referrer and request.host in referrer:
+        return redirect(referrer)
+    return redirect(url_for("index"))
+
+
+@app.errorhandler(CSRFError)
+def csrf_error_handler(e):
+    """Handle CSRF validation failure with localized message."""
+    lang = get_current_lang()
+    flash(get_text("msg_csrf_error", lang=lang), "danger")
+    referrer = request.referrer
+    if referrer and request.host in referrer:
+        return redirect(referrer)
+    return redirect(url_for("index"))
 
 
 # ---------------------------------------------------------------------------
@@ -43,114 +89,6 @@ def inject_translations():
 
 def get_current_lang():
     return session.get("lang", "fr")
-
-
-# ---------------------------------------------------------------------------
-# Database helpers
-# ---------------------------------------------------------------------------
-
-def get_db():
-    """Create a new MySQL connection."""
-    return mysql.connector.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        user=os.getenv("DB_USER", "root"),
-        password=os.getenv("DB_PASSWORD", ""),
-        database=os.getenv("DB_NAME", "douala_power_alert"),
-        charset="utf8mb4",
-        collation="utf8mb4_unicode_ci",
-    )
-
-
-def get_cursor(conn, dictionary=True):
-    return conn.cursor(dictionary=dictionary)
-
-
-def init_db():
-    """Ensure database and required tables exist on startup."""
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                full_name VARCHAR(150) NOT NULL,
-                email VARCHAR(150) NOT NULL UNIQUE,
-                phone VARCHAR(20) NOT NULL UNIQUE,
-                password_hash VARCHAR(255) NOT NULL,
-                neighborhood VARCHAR(100) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
-        """)
-        
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS admins (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(100) NOT NULL UNIQUE,
-                password_hash VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB;
-        """)
-        
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS outages (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                neighborhood VARCHAR(100) NOT NULL,
-                location VARCHAR(200) NOT NULL,
-                description TEXT,
-                start_time DATETIME NOT NULL,
-                estimated_restore DATETIME NULL,
-                status ENUM('PENDING', 'VERIFIED', 'RESTORED', 'REJECTED') DEFAULT 'PENDING',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB;
-        """)
-        
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS confirmations (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                outage_id INT NOT NULL,
-                user_id INT NOT NULL,
-                confirmation ENUM('STILL_OFF', 'RESTORED') NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (outage_id) REFERENCES outages(id) ON DELETE CASCADE,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                UNIQUE KEY unique_user_outage (outage_id, user_id)
-            ) ENGINE=InnoDB;
-        """)
-        conn.commit()
-        cur.close()
-        conn.close()
-        ensure_admin()
-    except Exception as e:
-        print(f"Database initialization warning: {e}")
-
-
-def ensure_admin():
-    """Ensure default admin account exists."""
-    try:
-        conn = get_db()
-        cur = get_cursor(conn)
-        cur.execute("SELECT id FROM admins WHERE username = %s", ("admin",))
-        row = cur.fetchone()
-        hashed = generate_password_hash("admin123")
-        if not row:
-            cur.execute(
-                "INSERT INTO admins (username, password_hash) VALUES (%s, %s)",
-                ("admin", hashed),
-            )
-        else:
-            cur.execute(
-                "UPDATE admins SET password_hash = %s WHERE username = %s",
-                (hashed, "admin"),
-            )
-        conn.commit()
-        cur.close()
-        conn.close()
-    except Error:
-        pass
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +140,7 @@ def index():
 
 
 @app.route("/register", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def register():
     lang = get_current_lang()
     form_data = {}
@@ -230,16 +169,12 @@ def register():
         password_hash = generate_password_hash(password)
 
         try:
-            conn = get_db()
-            cur = get_cursor(conn)
-            cur.execute(
-                """INSERT INTO users (full_name, email, phone, password_hash, neighborhood)
-                   VALUES (%s, %s, %s, %s, %s)""",
-                (full_name, email, phone, password_hash, neighborhood),
-            )
-            conn.commit()
-            cur.close()
-            conn.close()
+            with get_db_cursor(commit=True) as cur:
+                cur.execute(
+                    """INSERT INTO users (full_name, email, phone, password_hash, neighborhood)
+                       VALUES (%s, %s, %s, %s, %s)""",
+                    (full_name, email, phone, password_hash, neighborhood),
+                )
             flash(get_text("msg_reg_success", lang=lang), "success")
             return redirect(url_for("login"))
         except Error as e:
@@ -253,6 +188,7 @@ def register():
 
 
 @app.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def login():
     lang = get_current_lang()
     if request.method == "POST":
@@ -264,12 +200,9 @@ def login():
             return render_template("login.html", email=email)
 
         try:
-            conn = get_db()
-            cur = get_cursor(conn)
-            cur.execute("SELECT * FROM users WHERE email = %s", (email,))
-            user = cur.fetchone()
-            cur.close()
-            conn.close()
+            with get_db_cursor() as cur:
+                cur.execute("SELECT * FROM users WHERE email = %s", (email,))
+                user = cur.fetchone()
 
             if user and check_password_hash(user["password_hash"], password):
                 saved_lang = session.get("lang", "fr")
@@ -302,42 +235,37 @@ def logout():
 def dashboard():
     user_id = session["user_id"]
     try:
-        conn = get_db()
-        cur = get_cursor(conn)
+        with get_db_cursor() as cur:
+            cur.execute(
+                "SELECT COUNT(*) AS c FROM outages WHERE status IN ('PENDING', 'VERIFIED')"
+            )
+            active = cur.fetchone()["c"]
 
-        cur.execute(
-            "SELECT COUNT(*) AS c FROM outages WHERE status IN ('PENDING', 'VERIFIED')"
-        )
-        active = cur.fetchone()["c"]
+            cur.execute(
+                "SELECT COUNT(*) AS c FROM outages WHERE user_id = %s", (user_id,)
+            )
+            my_reports = cur.fetchone()["c"]
 
-        cur.execute(
-            "SELECT COUNT(*) AS c FROM outages WHERE user_id = %s", (user_id,)
-        )
-        my_reports = cur.fetchone()["c"]
+            cur.execute(
+                "SELECT COUNT(*) AS c FROM outages WHERE status = 'VERIFIED'"
+            )
+            verified = cur.fetchone()["c"]
 
-        cur.execute(
-            "SELECT COUNT(*) AS c FROM outages WHERE status = 'VERIFIED'"
-        )
-        verified = cur.fetchone()["c"]
+            cur.execute(
+                "SELECT COUNT(*) AS c FROM outages WHERE status = 'RESTORED'"
+            )
+            restored = cur.fetchone()["c"]
 
-        cur.execute(
-            "SELECT COUNT(*) AS c FROM outages WHERE status = 'RESTORED'"
-        )
-        restored = cur.fetchone()["c"]
-
-        cur.execute("""
-            SELECT o.*, 
-                   (SELECT COUNT(*) FROM confirmations c 
-                    WHERE c.outage_id = o.id AND c.confirmation = 'STILL_OFF') AS conf_count
-            FROM outages o
-            WHERE o.status IN ('PENDING', 'VERIFIED')
-            ORDER BY o.created_at DESC
-            LIMIT 5
-        """)
-        recent = cur.fetchall()
-
-        cur.close()
-        conn.close()
+            cur.execute("""
+                SELECT o.*, 
+                       (SELECT COUNT(*) FROM confirmations c 
+                        WHERE c.outage_id = o.id AND c.confirmation = 'STILL_OFF') AS conf_count
+                FROM outages o
+                WHERE o.status IN ('PENDING', 'VERIFIED')
+                ORDER BY o.created_at DESC
+                LIMIT 5
+            """)
+            recent = cur.fetchall()
 
         return render_template(
             "dashboard.html",
@@ -356,42 +284,79 @@ def dashboard():
 
 @app.route("/report", methods=["GET", "POST"])
 @login_required
+@limiter.limit("10 per minute")
 def report():
     lang = get_current_lang()
+    form_data = {
+        "neighborhood": session.get("user_neighborhood", ""),
+        "location": "",
+        "description": "",
+        "start_time": ""
+    }
+
     if request.method == "POST":
         neighborhood = request.form.get("neighborhood", "").strip()
         location = request.form.get("location", "").strip()
         description = request.form.get("description", "").strip()
         start_time_str = request.form.get("start_time", "").strip()
+        is_distinct = request.form.get("is_distinct", "") == "1"
+
+        form_data = {
+            "neighborhood": neighborhood,
+            "location": location,
+            "description": description,
+            "start_time": start_time_str
+        }
 
         if not all([neighborhood, location, start_time_str]):
             flash(get_text("msg_missing_report_fields", lang=lang), "danger")
-            return render_template("report.html")
+            return render_template("report.html", form_data=form_data, existing_duplicate=None)
 
         try:
             start_time = datetime.strptime(start_time_str, "%Y-%m-%dT%H:%M")
         except ValueError:
             flash(get_text("msg_invalid_datetime", lang=lang), "danger")
-            return render_template("report.html")
+            return render_template("report.html", form_data=form_data, existing_duplicate=None)
+
+        # Duplicate check: if user didn't explicitly tick "is_distinct", check for active outage in same neighborhood
+        if not is_distinct:
+            try:
+                with get_db_cursor() as cur:
+                    cur.execute("""
+                        SELECT o.id, o.neighborhood, o.location, o.start_time, o.status,
+                               (SELECT COUNT(*) FROM confirmations c WHERE c.outage_id = o.id AND c.confirmation = 'STILL_OFF') AS conf_count
+                        FROM outages o
+                        WHERE LOWER(o.neighborhood) = %s AND o.status IN ('PENDING', 'VERIFIED')
+                        ORDER BY o.created_at DESC
+                        LIMIT 1
+                    """, (neighborhood.lower(),))
+                    existing = cur.fetchone()
+
+                if existing:
+                    flash(
+                        get_text("msg_duplicate_found", lang=lang,
+                                 neighborhood=existing["neighborhood"],
+                                 location=existing["location"]),
+                        "warning"
+                    )
+                    return render_template("report.html", form_data=form_data, existing_duplicate=existing)
+            except Exception:
+                pass
 
         try:
-            conn = get_db()
-            cur = get_cursor(conn)
-            cur.execute(
-                """INSERT INTO outages
-                   (user_id, neighborhood, location, description, start_time, status)
-                   VALUES (%s, %s, %s, %s, %s, 'PENDING')""",
-                (session["user_id"], neighborhood, location, description, start_time),
-            )
-            conn.commit()
-            cur.close()
-            conn.close()
+            with get_db_cursor(commit=True) as cur:
+                cur.execute(
+                    """INSERT INTO outages
+                       (user_id, neighborhood, location, description, start_time, status)
+                       VALUES (%s, %s, %s, %s, %s, 'PENDING')""",
+                    (session["user_id"], neighborhood, location, description, start_time),
+                )
             flash(get_text("msg_report_success", lang=lang), "success")
             return redirect(url_for("outages"))
         except Error:
             flash(get_text("msg_report_error", lang=lang), "danger")
 
-    return render_template("report.html")
+    return render_template("report.html", form_data=form_data, existing_duplicate=None)
 
 
 @app.route("/outages")
@@ -400,9 +365,6 @@ def outages():
     status_filter = request.args.get("status", "").strip()
 
     try:
-        conn = get_db()
-        cur = get_cursor(conn)
-
         sql = """
             SELECT o.*,
                    (SELECT COUNT(*) FROM confirmations c
@@ -425,10 +387,9 @@ def outages():
 
         sql += " ORDER BY o.created_at DESC LIMIT 50"
 
-        cur.execute(sql, params)
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
+        with get_db_cursor() as cur:
+            cur.execute(sql, params)
+            rows = cur.fetchall()
 
         return render_template(
             "outages.html", outages=rows, search=search, status_filter=status_filter
@@ -442,30 +403,26 @@ def outages():
 def outage_details(outage_id):
     lang = get_current_lang()
     try:
-        conn = get_db()
-        cur = get_cursor(conn)
-        cur.execute("""
-            SELECT o.*, u.full_name,
-                   (SELECT COUNT(*) FROM confirmations c
-                    WHERE c.outage_id = o.id AND c.confirmation = 'STILL_OFF') AS conf_off,
-                   (SELECT COUNT(*) FROM confirmations c
-                    WHERE c.outage_id = o.id AND c.confirmation = 'RESTORED') AS conf_restored
-            FROM outages o
-            JOIN users u ON o.user_id = u.id
-            WHERE o.id = %s
-        """, (outage_id,))
-        outage = cur.fetchone()
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT o.*, u.full_name,
+                       (SELECT COUNT(*) FROM confirmations c
+                        WHERE c.outage_id = o.id AND c.confirmation = 'STILL_OFF') AS conf_off,
+                       (SELECT COUNT(*) FROM confirmations c
+                        WHERE c.outage_id = o.id AND c.confirmation = 'RESTORED') AS conf_restored
+                FROM outages o
+                JOIN users u ON o.user_id = u.id
+                WHERE o.id = %s
+            """, (outage_id,))
+            outage = cur.fetchone()
 
-        user_confirmed = False
-        if "user_id" in session and outage:
-            cur.execute(
-                "SELECT id FROM confirmations WHERE outage_id = %s AND user_id = %s",
-                (outage_id, session["user_id"]),
-            )
-            user_confirmed = cur.fetchone() is not None
-
-        cur.close()
-        conn.close()
+            user_confirmed = False
+            if "user_id" in session and outage:
+                cur.execute(
+                    "SELECT id FROM confirmations WHERE outage_id = %s AND user_id = %s",
+                    (outage_id, session["user_id"]),
+                )
+                user_confirmed = cur.fetchone() is not None
 
         if not outage:
             flash(get_text("msg_outage_not_found", lang=lang), "danger")
@@ -483,6 +440,7 @@ def outage_details(outage_id):
 
 @app.route("/outage/<int:outage_id>/confirm", methods=["POST"])
 @login_required
+@limiter.limit("20 per minute")
 def confirm_outage(outage_id):
     lang = get_current_lang()
     confirmation = request.form.get("confirmation", "").strip()
@@ -491,37 +449,58 @@ def confirm_outage(outage_id):
         return redirect(url_for("outage_details", outage_id=outage_id))
 
     try:
-        conn = get_db()
-        cur = get_cursor(conn)
+        auto_verified = False
+        auto_restored = False
+        total_confs = 0
 
-        cur.execute("SELECT status FROM outages WHERE id = %s", (outage_id,))
-        outage = cur.fetchone()
-        if not outage or outage["status"] == "REJECTED":
-            flash(get_text("msg_outage_not_found", lang=lang), "danger")
-            cur.close()
-            conn.close()
-            return redirect(url_for("outages"))
+        with get_db_cursor(commit=True) as cur:
+            cur.execute("SELECT status FROM outages WHERE id = %s", (outage_id,))
+            outage = cur.fetchone()
+            if not outage or outage["status"] == "REJECTED":
+                flash(get_text("msg_outage_not_found", lang=lang), "danger")
+                return redirect(url_for("outages"))
 
-        cur.execute(
-            "SELECT id FROM confirmations WHERE outage_id = %s AND user_id = %s",
-            (outage_id, session["user_id"]),
-        )
-        if cur.fetchone():
-            flash(get_text("msg_already_confirmed", lang=lang), "warning")
-            cur.close()
-            conn.close()
-            return redirect(url_for("outage_details", outage_id=outage_id))
+            cur.execute(
+                "SELECT id FROM confirmations WHERE outage_id = %s AND user_id = %s",
+                (outage_id, session["user_id"]),
+            )
+            if cur.fetchone():
+                flash(get_text("msg_already_confirmed", lang=lang), "warning")
+                return redirect(url_for("outage_details", outage_id=outage_id))
 
-        cur.execute(
-            """INSERT INTO confirmations (outage_id, user_id, confirmation)
-               VALUES (%s, %s, %s)""",
-            (outage_id, session["user_id"], confirmation),
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
+            cur.execute(
+                """INSERT INTO confirmations (outage_id, user_id, confirmation)
+                   VALUES (%s, %s, %s)""",
+                (outage_id, session["user_id"], confirmation),
+            )
 
-        if confirmation == "STILL_OFF":
+            # Community Auto-Verification: 3+ STILL_OFF confirmations auto-promote PENDING to VERIFIED
+            if confirmation == "STILL_OFF" and outage["status"] == "PENDING":
+                cur.execute(
+                    "SELECT COUNT(*) AS c FROM confirmations WHERE outage_id = %s AND confirmation = 'STILL_OFF'",
+                    (outage_id,)
+                )
+                total_confs = cur.fetchone()["c"]
+                if total_confs >= 3:
+                    cur.execute("UPDATE outages SET status = 'VERIFIED' WHERE id = %s", (outage_id,))
+                    auto_verified = True
+
+            # Community Auto-Restoration: 3+ RESTORED confirmations auto-promote to RESTORED
+            elif confirmation == "RESTORED" and outage["status"] in ("PENDING", "VERIFIED"):
+                cur.execute(
+                    "SELECT COUNT(*) AS c FROM confirmations WHERE outage_id = %s AND confirmation = 'RESTORED'",
+                    (outage_id,)
+                )
+                total_confs = cur.fetchone()["c"]
+                if total_confs >= 3:
+                    cur.execute("UPDATE outages SET status = 'RESTORED' WHERE id = %s", (outage_id,))
+                    auto_restored = True
+
+        if auto_verified:
+            flash(get_text("msg_auto_verified_community", lang=lang, count=total_confs), "success")
+        elif auto_restored:
+            flash(get_text("msg_auto_restored_community", lang=lang, count=total_confs), "success")
+        elif confirmation == "STILL_OFF":
             flash(get_text("msg_confirm_saved_off", lang=lang), "success")
         else:
             flash(get_text("msg_confirm_saved_restored", lang=lang), "success")
@@ -535,19 +514,16 @@ def confirm_outage(outage_id):
 @login_required
 def my_reports():
     try:
-        conn = get_db()
-        cur = get_cursor(conn)
-        cur.execute("""
-            SELECT o.*,
-                   (SELECT COUNT(*) FROM confirmations c
-                    WHERE c.outage_id = o.id AND c.confirmation = 'STILL_OFF') AS conf_count
-            FROM outages o
-            WHERE o.user_id = %s
-            ORDER BY o.created_at DESC
-        """, (session["user_id"],))
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT o.*,
+                       (SELECT COUNT(*) FROM confirmations c
+                        WHERE c.outage_id = o.id AND c.confirmation = 'STILL_OFF') AS conf_count
+                FROM outages o
+                WHERE o.user_id = %s
+                ORDER BY o.created_at DESC
+            """, (session["user_id"],))
+            rows = cur.fetchall()
         return render_template("my_reports.html", reports=rows)
     except Error:
         flash(get_text("msg_db_error", lang=get_current_lang()), "danger")
@@ -555,6 +531,7 @@ def my_reports():
 
 
 @app.route("/ai", methods=["GET", "POST"])
+@limiter.limit("15 per minute")
 def ai_page():
     lang = get_current_lang()
     answer = None
@@ -565,11 +542,8 @@ def ai_page():
             flash(get_text("msg_ask_question_empty", lang=lang), "warning")
         else:
             try:
-                conn = get_db()
-                cur = get_cursor(conn)
-                answer = ask_ai(question, cur, lang=lang)
-                cur.close()
-                conn.close()
+                with get_db_cursor() as cur:
+                    answer = ask_ai(question, cur, lang=lang)
             except Exception:
                 answer = (
                     "Désolé, l'assistant IA est temporairement indisponible. Veuillez réessayer plus tard."
@@ -584,6 +558,7 @@ def ai_page():
 # ---------------------------------------------------------------------------
 
 @app.route("/admin/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def admin_login():
     lang = get_current_lang()
     if request.method == "POST":
@@ -595,12 +570,9 @@ def admin_login():
             return render_template("admin/admin_login.html")
 
         try:
-            conn = get_db()
-            cur = get_cursor(conn)
-            cur.execute("SELECT * FROM admins WHERE username = %s", (username,))
-            admin = cur.fetchone()
-            cur.close()
-            conn.close()
+            with get_db_cursor() as cur:
+                cur.execute("SELECT * FROM admins WHERE username = %s", (username,))
+                admin = cur.fetchone()
 
             if admin and check_password_hash(admin["password_hash"], password):
                 saved_lang = session.get("lang", "fr")
@@ -631,42 +603,37 @@ def admin_logout():
 @admin_required
 def admin_dashboard():
     try:
-        conn = get_db()
-        cur = get_cursor(conn)
+        with get_db_cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS c FROM users")
+            total_users = cur.fetchone()["c"]
 
-        cur.execute("SELECT COUNT(*) AS c FROM users")
-        total_users = cur.fetchone()["c"]
+            cur.execute("SELECT COUNT(*) AS c FROM outages")
+            total_reports = cur.fetchone()["c"]
 
-        cur.execute("SELECT COUNT(*) AS c FROM outages")
-        total_reports = cur.fetchone()["c"]
+            cur.execute("SELECT COUNT(*) AS c FROM outages WHERE status = 'PENDING'")
+            pending = cur.fetchone()["c"]
 
-        cur.execute("SELECT COUNT(*) AS c FROM outages WHERE status = 'PENDING'")
-        pending = cur.fetchone()["c"]
+            cur.execute("SELECT COUNT(*) AS c FROM outages WHERE status = 'VERIFIED'")
+            verified = cur.fetchone()["c"]
 
-        cur.execute("SELECT COUNT(*) AS c FROM outages WHERE status = 'VERIFIED'")
-        verified = cur.fetchone()["c"]
+            cur.execute("SELECT COUNT(*) AS c FROM outages WHERE status = 'RESTORED'")
+            restored = cur.fetchone()["c"]
 
-        cur.execute("SELECT COUNT(*) AS c FROM outages WHERE status = 'RESTORED'")
-        restored = cur.fetchone()["c"]
-
-        cur.execute("""
-            SELECT o.*, u.full_name, u.email
-            FROM outages o
-            JOIN users u ON o.user_id = u.id
-            ORDER BY
-                CASE o.status
-                    WHEN 'PENDING' THEN 1
-                    WHEN 'VERIFIED' THEN 2
-                    WHEN 'RESTORED' THEN 3
-                    ELSE 4
-                END,
-                o.created_at DESC
-            LIMIT 100
-        """)
-        reports = cur.fetchall()
-
-        cur.close()
-        conn.close()
+            cur.execute("""
+                SELECT o.*, u.full_name, u.email
+                FROM outages o
+                JOIN users u ON o.user_id = u.id
+                ORDER BY
+                    CASE o.status
+                        WHEN 'PENDING' THEN 1
+                        WHEN 'VERIFIED' THEN 2
+                        WHEN 'RESTORED' THEN 3
+                        ELSE 4
+                    END,
+                    o.created_at DESC
+                LIMIT 100
+            """)
+            reports = cur.fetchall()
 
         return render_template(
             "admin/admin_dashboard.html",
@@ -691,15 +658,11 @@ def admin_dashboard():
 def admin_approve(outage_id):
     lang = get_current_lang()
     try:
-        conn = get_db()
-        cur = get_cursor(conn)
-        cur.execute(
-            "UPDATE outages SET status = 'VERIFIED' WHERE id = %s",
-            (outage_id,),
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
+        with get_db_cursor(commit=True) as cur:
+            cur.execute(
+                "UPDATE outages SET status = 'VERIFIED' WHERE id = %s",
+                (outage_id,),
+            )
         flash(get_text("msg_admin_approved", lang=lang, id=outage_id), "success")
     except Error:
         flash(get_text("msg_db_error", lang=lang), "danger")
@@ -711,15 +674,11 @@ def admin_approve(outage_id):
 def admin_reject(outage_id):
     lang = get_current_lang()
     try:
-        conn = get_db()
-        cur = get_cursor(conn)
-        cur.execute(
-            "UPDATE outages SET status = 'REJECTED' WHERE id = %s",
-            (outage_id,),
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
+        with get_db_cursor(commit=True) as cur:
+            cur.execute(
+                "UPDATE outages SET status = 'REJECTED' WHERE id = %s",
+                (outage_id,),
+            )
         flash(get_text("msg_admin_rejected", lang=lang, id=outage_id), "info")
     except Error:
         flash(get_text("msg_db_error", lang=lang), "danger")
@@ -731,15 +690,11 @@ def admin_reject(outage_id):
 def admin_restore(outage_id):
     lang = get_current_lang()
     try:
-        conn = get_db()
-        cur = get_cursor(conn)
-        cur.execute(
-            "UPDATE outages SET status = 'RESTORED' WHERE id = %s",
-            (outage_id,),
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
+        with get_db_cursor(commit=True) as cur:
+            cur.execute(
+                "UPDATE outages SET status = 'RESTORED' WHERE id = %s",
+                (outage_id,),
+            )
         flash(get_text("msg_admin_restored", lang=lang, id=outage_id), "success")
     except Error:
         flash(get_text("msg_db_error", lang=lang), "danger")
@@ -762,15 +717,11 @@ def admin_update(outage_id):
         return redirect(url_for("admin_dashboard"))
 
     try:
-        conn = get_db()
-        cur = get_cursor(conn)
-        cur.execute(
-            "UPDATE outages SET estimated_restore = %s WHERE id = %s",
-            (estimate, outage_id),
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
+        with get_db_cursor(commit=True) as cur:
+            cur.execute(
+                "UPDATE outages SET estimated_restore = %s WHERE id = %s",
+                (estimate, outage_id),
+            )
         flash(get_text("msg_admin_estimate_updated", lang=lang, id=outage_id), "success")
     except Error:
         flash(get_text("msg_db_error", lang=lang), "danger")
@@ -782,12 +733,8 @@ def admin_update(outage_id):
 def admin_delete(outage_id):
     lang = get_current_lang()
     try:
-        conn = get_db()
-        cur = get_cursor(conn)
-        cur.execute("DELETE FROM outages WHERE id = %s", (outage_id,))
-        conn.commit()
-        cur.close()
-        conn.close()
+        with get_db_cursor(commit=True) as cur:
+            cur.execute("DELETE FROM outages WHERE id = %s", (outage_id,))
         flash(get_text("msg_admin_deleted", lang=lang, id=outage_id), "info")
     except Error:
         flash(get_text("msg_db_error", lang=lang), "danger")
@@ -795,25 +742,60 @@ def admin_delete(outage_id):
 
 
 # ---------------------------------------------------------------------------
-# API endpoint for map markers (simple JSON)
+# API endpoints (JSON)
 # ---------------------------------------------------------------------------
+
+@app.route("/api/outages/active-by-neighborhood")
+def api_active_by_neighborhood():
+    """Return active outages for a neighborhood to detect duplicates."""
+    neighborhood = request.args.get("neighborhood", "").strip().lower()
+    if not neighborhood:
+        return jsonify({"found": False, "outages": []})
+
+    try:
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT o.id, o.neighborhood, o.location, o.start_time, o.status,
+                       (SELECT COUNT(*) FROM confirmations c WHERE c.outage_id = o.id AND c.confirmation = 'STILL_OFF') AS conf_count
+                FROM outages o
+                WHERE LOWER(o.neighborhood) = %s AND o.status IN ('PENDING', 'VERIFIED')
+                ORDER BY o.created_at DESC
+                LIMIT 3
+            """, (neighborhood,))
+            rows = cur.fetchall()
+
+        if not rows:
+            return jsonify({"found": False, "outages": []})
+
+        outages_list = []
+        for r in rows:
+            st = r["start_time"].strftime("%H:%M") if r.get("start_time") else ""
+            outages_list.append({
+                "id": r["id"],
+                "neighborhood": r["neighborhood"],
+                "location": r["location"],
+                "status": r["status"],
+                "start_time": st,
+                "conf_count": r["conf_count"]
+            })
+        return jsonify({"found": True, "outages": outages_list})
+    except Exception:
+        return jsonify({"found": False, "outages": []})
+
 
 @app.route("/api/outages/map")
 def api_map_outages():
     """Return outages for the simple map markers."""
     try:
-        conn = get_db()
-        cur = get_cursor(conn)
-        cur.execute("""
-            SELECT id, neighborhood, location, status
-            FROM outages
-            WHERE status IN ('PENDING', 'VERIFIED', 'RESTORED')
-            ORDER BY created_at DESC
-            LIMIT 50
-        """)
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
+        with get_db_cursor() as cur:
+            cur.execute("""
+                SELECT id, neighborhood, location, status
+                FROM outages
+                WHERE status IN ('PENDING', 'VERIFIED', 'RESTORED')
+                ORDER BY created_at DESC
+                LIMIT 50
+            """)
+            rows = cur.fetchall()
 
         coords = {
             "bonamoussadi": [4.0850, 9.7400],
@@ -861,4 +843,3 @@ def api_map_outages():
 if __name__ == "__main__":
     init_db()
     app.run(debug=True, host="0.0.0.0", port=5000)
-

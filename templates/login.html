@@ -8,6 +8,7 @@
         <p class="muted">{{ t('login_subtitle') }}</p>
 
         <form method="POST" action="{{ url_for('login') }}" id="loginForm" novalidate style="margin-top: 20px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label for="email">{{ t('label_email') }}</label>
                 <input type="email" id="email" name="email" required

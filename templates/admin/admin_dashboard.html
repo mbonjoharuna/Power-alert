@@ -74,24 +74,29 @@
                         <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
                             {% if r.status == 'PENDING' %}
                             <form method="POST" action="{{ url_for('admin_approve', outage_id=r.id) }}" class="inline-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-success">✓ {{ t('btn_approve') }}</button>
                             </form>
                             <form method="POST" action="{{ url_for('admin_reject', outage_id=r.id) }}" class="inline-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-danger"
                                         onclick="return confirm('{{ t('confirm_reject') }}');">✕ {{ t('btn_reject') }}</button>
                             </form>
                             {% endif %}
                             {% if r.status in ['PENDING', 'VERIFIED'] %}
                             <form method="POST" action="{{ url_for('admin_restore', outage_id=r.id) }}" class="inline-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-secondary">⚡ {{ t('btn_mark_restored') }}</button>
                             </form>
                             {% endif %}
                             <form method="POST" action="{{ url_for('admin_delete', outage_id=r.id) }}" class="inline-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-outline" style="color: #ef4444; border-color: #fecaca;"
                                         onclick="return confirm('{{ t('confirm_delete') }}');">🗑️</button>
                             </form>
                         </div>
                         <form method="POST" action="{{ url_for('admin_update', outage_id=r.id) }}" class="inline-form estimate-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <input type="datetime-local" name="estimated_restore" required class="input-sm">
                             <button type="submit" class="btn btn-sm btn-outline">⏳ {{ t('btn_update_estimate') }}</button>
                         </form>
